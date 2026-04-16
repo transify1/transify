@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-apple-blue: #0071e3;
+  --color-apple-gray: #f5f5f7;
+  --radius-apple: 12px;
+}
+
+@layer base {
+  body {
+    @apply font-sans text-[#111] antialiased bg-[#fcfcfc];
+    line-height: 1.5;
+  }
+
+  h1 {
+    @apply text-[20px] md:text-[22px] font-black tracking-tight text-[#111];
+  }
+
+  h2 {
+    @apply text-[17px] md:text-[18px] font-bold tracking-tight text-[#111];
+  }
+
+  h3 {
+    @apply text-[16px] font-bold tracking-tight text-[#111];
+  }
+
+  p {
+    @apply text-[14px] md:text-[15px] text-[#333] leading-relaxed;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    white-space: normal;
+  }
+
+  .text-secondary {
+    @apply text-[12px] md:text-[13px] text-slate-500 font-medium;
+  }
+
+  .text-label {
+    @apply text-[11px] font-bold uppercase tracking-wider text-slate-400;
+  }
+}
+
+@layer components {
+  .apple-card {
+    @apply bg-white rounded-[12px] border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-300 overflow-hidden p-4;
+  }
+
+  .apple-button-primary {
+    @apply px-5 py-2.5 bg-[#111] text-white rounded-[10px] font-bold text-[14px] hover:bg-slate-800 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2;
+  }
+
+  .apple-button-secondary {
+    @apply px-5 py-2.5 bg-slate-100 text-[#111] rounded-[10px] font-bold text-[14px] hover:bg-slate-200 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2;
+  }
+
+  .glass-morphism {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20;
+  }
+
+  .fluid-bg {
+    @apply relative overflow-hidden;
+    background: #fcfcfc;
+  }
+}

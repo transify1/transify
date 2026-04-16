@@ -1,0 +1,7 @@
+{
+  "name": "Transify",
+  "description": "Plateforme logistique avancée pour la gestion digitale complète des transitaires et le suivi intelligent des colis pour les clients.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
