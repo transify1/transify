@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Globe, Phone, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import Logo from '../../components/Logo';
+import { WEST_AFRICAN_COUNTRIES } from '../../constants';
+import { supabase } from '../../lib/supabase';
 
 export default function SignupPage() {
   const [name, setName] = useState('');
@@ -13,17 +15,72 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [role, setRole] = useState<'client' | 'transitaire'>('client');
+  const [country, setCountry] = useState(WEST_AFRICAN_COUNTRIES[0].name);
+  const [phoneIndicator, setPhoneIndicator] = useState(WEST_AFRICAN_COUNTRIES[0].indicator);
+  const [phone, setPhone] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { setUser } = useApp();
   const navigate = useNavigate();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role === 'transitaire') {
-      navigate('/register/transitaire');
+    if (password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
       return;
     }
-    setUser({ id: 'u' + Date.now(), name, email, role });
-    navigate('/client/dashboard');
+
+    if (role === 'transitaire') {
+      navigate('/register/transitaire', { 
+        state: { name, email, password, country, phone, phoneIndicator } 
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role,
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (data.user) {
+        // Create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: data.user.id,
+            name,
+            email,
+            role,
+            country,
+            phone: `${phoneIndicator} ${phone}`,
+            profile_progress: 15
+          }]);
+
+        if (profileError) throw profileError;
+
+        setIsSuccess(true);
+        setTimeout(() => {
+          navigate('/client/dashboard');
+        }, 1500);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Une erreur est survenue lors de l\'inscription');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -62,6 +119,13 @@ export default function SignupPage() {
               </button>
             </div>
 
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-[12px] text-[14px] font-medium flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse" />
+                {error}
+              </div>
+            )}
+
             <form onSubmit={handleSignup} className="space-y-5">
               <div>
                 <label className="block text-[15px] font-medium text-slate-900 mb-2">Nom complet *</label>
@@ -73,6 +137,56 @@ export default function SignupPage() {
                   className="w-full px-5 py-3.5 bg-[#f1f5f9] border-none rounded-[12px] focus:ring-2 focus:ring-[#3b82f6]/20 focus:bg-white transition-all text-[15px] font-medium placeholder:text-slate-400"
                   placeholder="Ex: Mamadou Diallo"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[15px] font-medium text-slate-900 mb-2">Pays de résidence *</label>
+                <div className="relative group">
+                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#3b82f6] transition-colors" size={18} />
+                  <select 
+                    value={country}
+                    onChange={(e) => {
+                      const countryName = e.target.value;
+                      const c = WEST_AFRICAN_COUNTRIES.find(item => item.name === countryName);
+                      setCountry(countryName);
+                      if (c) setPhoneIndicator(c.indicator);
+                    }}
+                    className="w-full pl-12 pr-10 py-3.5 bg-[#f1f5f9] border-none rounded-[12px] focus:ring-2 focus:ring-[#3b82f6]/20 focus:bg-white transition-all text-[15px] font-medium appearance-none"
+                  >
+                    {WEST_AFRICAN_COUNTRIES.map(c => (
+                      <option key={c.code} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                  <ArrowRight size={16} className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[15px] font-medium text-slate-900 mb-2">Téléphone *</label>
+                <div className="flex gap-2">
+                  <div className="relative group w-[100px] shrink-0">
+                    <select
+                      value={phoneIndicator}
+                      onChange={(e) => setPhoneIndicator(e.target.value)}
+                      className="w-full px-3 py-3.5 bg-[#f1f5f9] border-none rounded-[12px] focus:ring-2 focus:ring-[#3b82f6]/20 focus:bg-white transition-all text-[14px] font-bold appearance-none text-center"
+                    >
+                      {WEST_AFRICAN_COUNTRIES.map(c => (
+                        <option key={c.code} value={c.indicator}>{c.indicator}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="relative group flex-1">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#3b82f6] transition-colors" size={18} />
+                    <input 
+                      type="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full pl-12 pr-5 py-3.5 bg-[#f1f5f9] border-none rounded-[12px] focus:ring-2 focus:ring-[#3b82f6]/20 focus:bg-white transition-all text-[15px] font-medium placeholder:text-slate-400"
+                      placeholder="77 000 00 00"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -137,10 +251,20 @@ export default function SignupPage() {
 
               <button 
                 type="submit"
-                disabled={!acceptTerms}
-                className="w-full py-4 bg-[#3b82f6] text-white rounded-[12px] font-bold text-[16px] hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 active:scale-[0.98] mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!acceptTerms || isSubmitting || isSuccess}
+                className="w-full py-4 bg-[#3b82f6] text-white rounded-[12px] font-bold text-[16px] hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 active:scale-[0.98] mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Créer mon compte gratuit
+                {isSubmitting ? (
+                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <path d="M21 12a9 9 0 11-6.219-8.56" />
+                    </svg>
+                  </motion.div>
+                ) : isSuccess ? (
+                  "Compte créé !"
+                ) : (
+                  "Créer mon compte gratuit"
+                )}
               </button>
             </form>
           </div>

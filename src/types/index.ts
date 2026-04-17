@@ -5,12 +5,24 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  country?: string;
   phone?: string;
   avatar?: string;
   companyId?: string; // For transitaires and their team
   subscription?: string; // 'starter' | 'pro' | 'enterprise'
   favorites?: string[];
   profileProgress?: number;
+  addresses?: Address[];
+}
+
+export interface Address {
+  id: string;
+  name: string;
+  recipient: string;
+  phone: string;
+  address: string;
+  city: string;
+  isDefault?: boolean;
 }
 
 export interface Company {
@@ -83,6 +95,7 @@ export interface Order {
   reviewed?: boolean;
   departureDate?: string;
   estimatedArrival?: string;
+  paymentStatus?: 'paid' | 'unpaid';
 }
 
 export interface Review {
@@ -102,6 +115,18 @@ export interface Review {
   createdAt: string;
 }
 
+export interface Ticket {
+  id: string;
+  userId: string;
+  subject: string;
+  content: string;
+  status: 'resolved' | 'in_progress' | 'problem';
+  priority: 'low' | 'medium' | 'high';
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Message {
   id: string;
   senderId: string;
@@ -116,6 +141,7 @@ export interface Message {
 
 export interface Shipment {
   id: string;
+  companyId: string;
   type: 'air' | 'sea';
   reference: string;
   departureDate: string;

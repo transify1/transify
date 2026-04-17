@@ -106,7 +106,7 @@ const ProgressBar = ({ status }: { status: string }) => {
 };
 
 export default function ClientOrders() {
-  const { orders, formatPrice } = useApp();
+  const { orders, formatPrice, sidebarCollapsed, updateOrder, addNotification } = useApp();
   const navigate = useNavigate();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [activeFilter, setActiveFilter] = useState('Tous');
@@ -171,6 +171,7 @@ export default function ClientOrders() {
       case 'in_transit': return 'bg-blue-100 text-blue-600';
       case 'received': return 'bg-yellow-100 text-yellow-600';
       case 'problem': return 'bg-red-100 text-red-600';
+      case 'cancelled': return 'bg-slate-100 text-slate-400';
       default: return 'bg-slate-100 text-slate-600';
     }
   };
@@ -182,6 +183,7 @@ export default function ClientOrders() {
       case 'in_transit': return 'En transit';
       case 'received': return 'Reçu au dépôt';
       case 'problem': return 'Problème';
+      case 'cancelled': return 'Annulée';
       case 'pending': return 'En attente';
       default: return status;
     }
@@ -278,17 +280,7 @@ export default function ClientOrders() {
     }, 200);
   };
 
-  const qrData = selectedOrder ? JSON.stringify({
-    id_commande: selectedOrder.id,
-    nom: selectedOrder.clientName,
-    telephone: selectedOrder.clientPhone,
-    telephone2: selectedOrder.clientPhone2 || "N/A",
-    adresse: selectedOrder.destination,
-    type_transport: selectedOrder.serviceType,
-    poids: selectedOrder.weight || "N/A",
-    dimensions: selectedOrder.dimensions || "N/A",
-    date: selectedOrder.createdAt
-  }) : '';
+  const qrData = selectedOrder ? `${window.location.origin}/track/${selectedOrder.id}` : '';
 
   const timelineSteps = [
     { status: 'delivered', label: 'Colis livré', icon: <CheckCircle2 size={12} /> },
@@ -296,7 +288,22 @@ export default function ClientOrders() {
     { status: 'in_transit', label: 'En transit international', icon: <Truck size={12} /> },
     { status: 'received', label: 'Reçu chez le transitaire', icon: <Package size={12} /> },
     { status: 'pending', label: 'Commande validée', icon: <Zap size={12} /> },
+    { status: 'cancelled', label: 'Commande annulée', icon: <X size={12} /> }
   ];
+
+  const handleCancelOrder = async () => {
+    if (!selectedOrder || selectedOrder.status !== 'pending') return;
+    if (window.confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+      await updateOrder(selectedOrder.id, { status: 'cancelled' });
+      addNotification({
+        userId: selectedOrder.companyId,
+        title: "Commande annulée",
+        content: `Le client a annulé la commande ${selectedOrder.id}.`,
+        type: 'order',
+        metadata: { orderId: selectedOrder.id }
+      });
+    }
+  };
 
   const getStepStatus = (stepStatus: string, currentStatus: string) => {
     const statusOrder = ['pending', 'received', 'in_transit', 'arrived', 'delivered'];
@@ -327,7 +334,10 @@ export default function ClientOrders() {
     <div className="min-h-screen bg-white pb-24 lg:pb-0 fluid-bg">
       <ClientSidebar />
       
-      <div className="lg:ml-72">
+      <div className={cn(
+        "transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
@@ -444,6 +454,15 @@ export default function ClientOrders() {
                 <div className="flex justify-between items-center">
                   <p className="text-[16px] font-bold text-slate-900 tracking-tight">{formatPrice(order.price || 0)}</p>
                   <div className="flex items-center gap-2">
+                    {order.paymentStatus === 'paid' ? (
+                      <span className="flex items-center gap-1 text-[11px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        <CheckCircle2 size={10} /> Payé
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        <Clock size={10} /> En attente
+                      </span>
+                    )}
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -551,7 +570,15 @@ export default function ClientOrders() {
                     </div>
                     <div className="p-4 bg-slate-50 rounded-[16px]">
                       <p className="text-[12px] font-medium text-slate-500 mb-1">Coût Final</p>
-                      <p className="text-[18px] font-bold text-slate-900 tracking-tight">{formatPrice(selectedOrder.price || 0)}</p>
+                      <div className="flex flex-col">
+                        <p className="text-[18px] font-bold text-slate-900 tracking-tight">{formatPrice(selectedOrder.price || 0)}</p>
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase tracking-wider mt-1",
+                          selectedOrder.paymentStatus === 'paid' ? "text-green-600" : "text-red-500"
+                        )}>
+                          {selectedOrder.paymentStatus === 'paid' ? '● Payé' : '● Non payé'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -609,6 +636,14 @@ export default function ClientOrders() {
                       <Star size={18} fill="currentColor" /> Évaluer
                     </button>
                   )}
+                  {selectedOrder.status === 'pending' && (
+                    <button 
+                      onClick={handleCancelOrder}
+                      className="flex-1 py-4 bg-white border border-red-100 text-red-500 rounded-[16px] font-medium text-[14px] flex items-center justify-center gap-2 hover:bg-red-50 transition-all"
+                    >
+                      <X size={18} /> Annuler
+                    </button>
+                  )}
                   <button 
                     onClick={() => navigate(`/client/transitaire/${selectedOrder.companyId}`)}
                     className="flex-1 py-4 bg-white border border-slate-200 rounded-[16px] font-medium text-[14px] flex items-center justify-center gap-2 hover:bg-slate-100 transition-all"
@@ -654,15 +689,7 @@ export default function ClientOrders() {
             </div>
             <div className="mb-10">
               <QRCodeCanvas 
-                value={JSON.stringify({
-                  id_commande: sharingOrder.id,
-                  nom: sharingOrder.clientName,
-                  telephone: sharingOrder.clientPhone,
-                  adresse: sharingOrder.destination,
-                  type_transport: sharingOrder.serviceType,
-                  poids: sharingOrder.weight || "N/A",
-                  date: sharingOrder.createdAt
-                })}
+                value={sharingOrder.id}
                 size={240}
                 level="H"
                 includeMargin={false}

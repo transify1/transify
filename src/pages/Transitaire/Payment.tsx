@@ -29,21 +29,24 @@ export default function TransitairePayment() {
 
   const plan = plans[planId] || plans.pro;
 
-  const handlePayment = (e: React.FormEvent) => {
+  const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsProcessing(false);
-      // Randomly succeed or fail for demo (mostly succeed)
-      const success = Math.random() > 0.05;
+    // Process and navigate
+    try {
+      // Small artificial delay for UX (perceived security)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const success = Math.random() > 0.02; // Very high success rate for demo
       if (success) {
         navigate(`/transitaire/payment-status?status=success&plan=${planId}`);
       } else {
         navigate(`/transitaire/payment-status?status=error&plan=${planId}`);
       }
-    }, 2500);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (

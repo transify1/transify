@@ -8,8 +8,9 @@ import {
   ArrowLeft, Ship, Plane, Zap, CheckCircle2, 
   Package, MapPin, Info, AlertCircle, ChevronRight,
   ChevronLeft, DollarSign, Scale, Box, Truck,
-  Download, Share2, Printer, Loader2
+  Download, Share2, Printer, Loader2, Globe, Phone
 } from 'lucide-react';
+import { WEST_AFRICAN_COUNTRIES } from '../../constants';
 import { cn } from '../../lib/utils';
 import Logo from '../../components/Logo';
 
@@ -30,7 +31,9 @@ export default function CreateOrder() {
   
   // Client Info
   const [clientName, setClientName] = useState(user?.name || '');
+  const [phoneIndicator1, setPhoneIndicator1] = useState(WEST_AFRICAN_COUNTRIES[0].indicator);
   const [clientPhone1, setClientPhone1] = useState(user?.phone || '');
+  const [phoneIndicator2, setPhoneIndicator2] = useState(WEST_AFRICAN_COUNTRIES[0].indicator);
   const [clientPhone2, setClientPhone2] = useState('');
   const [destination, setDestination] = useState('');
   
@@ -111,8 +114,8 @@ export default function CreateOrder() {
       id: orderId,
       clientId: user?.id || 'guest',
       clientName,
-      clientPhone: clientPhone1,
-      clientPhone2: clientPhone2 || undefined,
+      clientPhone: `${phoneIndicator1} ${clientPhone1}`,
+      clientPhone2: clientPhone2 ? `${phoneIndicator2} ${clientPhone2}` : undefined,
       companyId: company.id,
       companyName: company.name,
       serviceId: selectedServiceId,
@@ -124,19 +127,21 @@ export default function CreateOrder() {
       dimensions: selectedService?.type === 'maritime' ? { length: l, width: w, height: h } : undefined,
       price: estimatedPrice,
       destination,
-      trackingNumber: orderId, // Use the same for tracking or a variation
+      trackingNumber: orderId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      qrCode: orderId, // We'll store the ID as the QR reference
+      qrCode: orderId,
     };
 
-    // Simulate API call
-    setTimeout(() => {
-      addOrder(newOrder);
+    try {
+      await addOrder(newOrder);
       setCreatedOrder(newOrder);
-      setIsSubmitting(false);
       setOrderSuccess(true);
-    }, 2000);
+    } catch (error) {
+      console.error("Error creating order:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const downloadQRCode = async () => {
@@ -444,25 +449,47 @@ export default function CreateOrder() {
                     </div>
                     <div>
                       <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Téléphone 1</label>
-                      <input 
-                        type="tel"
-                        value={clientPhone1}
-                        onChange={(e) => setClientPhone1(e.target.value)}
-                        placeholder="+221 ..."
-                        className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-black text-slate-900 text-[13px]"
-                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={phoneIndicator1}
+                          onChange={(e) => setPhoneIndicator1(e.target.value)}
+                          className="w-16 px-1 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-black text-slate-900 text-[11px] appearance-none text-center"
+                        >
+                          {WEST_AFRICAN_COUNTRIES.map(c => (
+                            <option key={c.code} value={c.indicator}>{c.indicator}</option>
+                          ))}
+                        </select>
+                        <input 
+                          type="tel"
+                          value={clientPhone1}
+                          onChange={(e) => setClientPhone1(e.target.value)}
+                          placeholder="77 000 00 00"
+                          className="flex-1 px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-black text-slate-900 text-[13px]"
+                        />
+                      </div>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Téléphone 2 (Optionnel)</label>
-                    <input 
-                      type="tel"
-                      value={clientPhone2}
-                      onChange={(e) => setClientPhone2(e.target.value)}
-                      placeholder="+221 ..."
-                      className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-black text-slate-900 text-[13px]"
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={phoneIndicator2}
+                        onChange={(e) => setPhoneIndicator2(e.target.value)}
+                        className="w-16 px-1 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-black text-slate-900 text-[11px] appearance-none text-center"
+                      >
+                        {WEST_AFRICAN_COUNTRIES.map(c => (
+                          <option key={c.code} value={c.indicator}>{c.indicator}</option>
+                        ))}
+                      </select>
+                      <input 
+                        type="tel"
+                        value={clientPhone2}
+                        onChange={(e) => setClientPhone2(e.target.value)}
+                        placeholder="77 000 00 00"
+                        className="flex-1 px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-black text-slate-900 text-[13px]"
+                      />
+                    </div>
                   </div>
 
                   <div>

@@ -34,7 +34,7 @@ const StatCard = ({ title, value, icon, trend, color, subtitle }: any) => (
 );
 
 export default function TransitaireDashboard() {
-  const { orders, user, companies, notifications, markNotificationAsRead, markAllNotificationsAsRead } = useApp();
+  const { orders, user, companies, notifications, markNotificationAsRead, markAllNotificationsAsRead, sidebarCollapsed } = useApp();
   const [showChecklist, setShowChecklist] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const company = companies.find(c => c.id === user?.companyId);
@@ -59,8 +59,10 @@ export default function TransitaireDashboard() {
   return (
     <div className="min-h-screen bg-white fluid-bg">
       <TransitaireSidebar />
-
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-7xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-7xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         {/* Checklist Modal */}
         <AnimatePresence>
           {showChecklist && (
@@ -204,7 +206,7 @@ export default function TransitaireDashboard() {
                             <div className="flex-1">
                               <p className="text-[14px] font-semibold text-slate-900 mb-0.5">{notification.title}</p>
                               <p className="text-[13px] text-slate-500 mb-1 leading-tight">{notification.content}</p>
-                              <p className="text-[11px] text-slate-400">{formatDate(notification.timestamp)}</p>
+                              <p className="text-[11px] text-slate-400">{formatDate(notification.createdAt)}</p>
                             </div>
                             {!notification.read && <div className="w-2.5 h-2.5 bg-apple-blue rounded-full mt-1.5 shrink-0" />}
                           </div>

@@ -17,7 +17,7 @@ import { cn, formatDate } from '../../lib/utils';
 import { Shipment } from '../../types';
 
 export default function TransitaireShipments() {
-  const { shipments, orders, addShipment, updateShipment, updateOrder } = useApp();
+  const { user, shipments, orders, addShipment, updateShipment, updateOrder, sidebarCollapsed } = useApp();
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState<'all' | 'air' | 'sea'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -171,6 +171,7 @@ export default function TransitaireShipments() {
 
     const shipment: Shipment = {
       id: `sh-${Date.now()}`,
+      companyId: user?.companyId || '',
       type: newShipment.type,
       reference: newShipment.reference,
       departureDate: new Date(newShipment.departureDate).toISOString(),
@@ -250,8 +251,10 @@ export default function TransitaireShipments() {
   return (
     <div className="min-h-screen bg-[#F8F9FB]">
       <TransitaireSidebar />
-
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-7xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-7xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8">
           <div>
             <h1 className="text-[20px] font-bold text-slate-900 mb-1 tracking-tight">Gestion des Expéditions</h1>

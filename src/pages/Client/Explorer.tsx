@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 
 import ClientSidebar from '../../components/Client/Sidebar';
+import { WEST_AFRICAN_COUNTRIES } from '../../constants';
 
 const BottomNav = () => (
   <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-6 py-3 flex justify-between items-center z-50 lg:hidden">
@@ -38,7 +39,7 @@ const BottomNav = () => (
 );
 
 export default function Explorer() {
-  const { companies, user, toggleFavorite } = useApp();
+  const { companies, user, toggleFavorite, sidebarCollapsed } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCountry, setSelectedCountry] = useState('Tous');
   const [selectedTransport, setSelectedTransport] = useState('Tous');
@@ -54,7 +55,7 @@ export default function Explorer() {
     return matchesSearch && matchesCountry && matchesTransport && matchesRating;
   });
 
-  const countries = ['Tous', 'Sénégal', 'Côte d\'Ivoire', 'Mali', 'Burkina Faso', 'Guinée'];
+  const countries = ['Tous', ...WEST_AFRICAN_COUNTRIES.map(c => c.name)];
   const transports = ['Tous', 'Maritime', 'Aérien', 'Express'];
   const ratings = [0, 3, 4, 4.5];
 
@@ -68,7 +69,10 @@ export default function Explorer() {
     <div className="min-h-screen bg-white pb-24 lg:pb-0 fluid-bg">
       <ClientSidebar />
       
-      <div className="lg:ml-72">
+      <div className={cn(
+        "transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 lg:px-8 pt-4 pb-2">

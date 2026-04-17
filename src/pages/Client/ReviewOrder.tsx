@@ -26,6 +26,7 @@ export default function ReviewOrder() {
     price: 0
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!order) {
     return (
@@ -69,10 +70,11 @@ export default function ReviewOrder() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0) return;
+    if (rating === 0 || isSubmitting) return;
 
+    setIsSubmitting(true);
     const review = {
       id: `rev-${Date.now()}`,
       orderId: order.id,
@@ -85,12 +87,19 @@ export default function ReviewOrder() {
       createdAt: new Date().toISOString()
     };
 
-    addReview(review);
-    setIsSubmitted(true);
-    
-    setTimeout(() => {
-      navigate('/client/orders');
-    }, 3000);
+    try {
+      await addReview(review);
+      setIsSubmitted(true);
+      
+      // Navigate after a short moment for the user to see success
+      setTimeout(() => {
+        navigate('/client/orders');
+      }, 2000);
+    } catch (error) {
+      console.error("Error submitting review:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderStars = (current: number, setter: (v: number) => void, hover: number, setHover: (v: number) => void) => (

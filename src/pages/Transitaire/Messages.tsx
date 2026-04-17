@@ -10,26 +10,26 @@ import TransitaireSidebar from '../../components/Transitaire/Sidebar';
 import { cn } from '../../lib/utils';
 
 export default function TransitaireMessages() {
-  const { user, messages, orders } = useApp();
+  const { user, messages, orders, sidebarCollapsed } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
   // For transitaire, we need to find all clients they have chatted with
   // or who have orders with them
   const clientIds = Array.from(new Set([
-    ...messages.filter(m => m.senderId === user?.companyId || m.receiverId === user?.companyId)
-      .map(m => m.senderId === user?.companyId ? m.receiverId : m.senderId),
+    ...messages.filter(m => m.senderId === user?.id || m.receiverId === user?.id)
+      .map(m => m.senderId === user?.id ? m.receiverId : m.senderId),
     ...orders.filter(o => o.companyId === user?.companyId).map(o => o.clientId)
   ]));
 
   const conversations = clientIds.map(clientId => {
     const clientMessages = messages.filter(m => 
-      (m.senderId === clientId && m.receiverId === user?.companyId) || 
-      (m.senderId === user?.companyId && m.receiverId === clientId)
+      (m.senderId === clientId && m.receiverId === user?.id) || 
+      (m.senderId === user?.id && m.receiverId === clientId)
     ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     const lastMessage = clientMessages[0];
-    const unreadCount = clientMessages.filter(m => m.receiverId === user?.companyId && !m.read).length;
+    const unreadCount = clientMessages.filter(m => m.receiverId === user?.id && !m.read).length;
     
     // Find client name from orders or messages
     const clientName = orders.find(o => o.clientId === clientId)?.clientName || 
@@ -51,7 +51,10 @@ export default function TransitaireMessages() {
     <div className="min-h-screen bg-white fluid-bg">
       <TransitaireSidebar />
       
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-5xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-5xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex justify-between items-center mb-6">
           <div>
             <h1>Centre de Messages</h1>

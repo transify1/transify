@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Company, Order, Message, Review, Shipment } from '../types';
+import { supabase, hasSupabaseConfig } from '../lib/supabase';
 
 interface AppContextType {
   user: User | null;
@@ -10,10 +11,12 @@ interface AppContextType {
   reviews: Review[];
   shipments: Shipment[];
   notifications: any[];
+  tickets: any[];
   addOrder: (order: Order) => void;
   updateOrder: (orderId: string, updates: Partial<Order>) => void;
   addReview: (review: Review) => void;
   addMessage: (message: Message) => void;
+  addTicket: (ticket: any) => Promise<void>;
   markAsRead: (senderId: string) => void;
   updateSubscription: (plan: string) => void;
   toggleFavorite: (companyId: string) => void;
@@ -23,6 +26,8 @@ interface AppContextType {
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
   updateCompany: (companyId: string, updates: Partial<Company>) => void;
+  updateProfile: (updates: Partial<User>) => Promise<void>;
+  addCompany: (company: Company) => void;
   language: string;
   setLanguage: (lang: string) => void;
   currency: string;
@@ -30,6 +35,9 @@ interface AppContextType {
   formatPrice: (price: number) => string;
   t: (key: string) => string;
   logout: () => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  loading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -41,280 +49,449 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [messages, setMessages] = useState<Message[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([
-    { id: '1', title: 'Colis Reçu', message: 'Votre colis TRX-2026-001 a été reçu par le transitaire.', time: 'Il y a 2h', read: false, type: 'package' },
-    { id: '2', title: 'Nouveau Message', message: 'Global Logistics vous a envoyé un message.', time: 'Il y a 5h', read: true, type: 'message' },
-    { id: '3', title: 'Paiement Validé', message: 'Votre paiement pour la commande #892 a été confirmé.', time: 'Hier', read: true, type: 'payment' },
-  ]);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [language, setLanguage] = useState('Français (FR)');
-  const [currency, setCurrency] = useState('Franc CFA (XOF)');
+  const [currency, setCurrency] = useState('FCFA');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Mock initial data
+  // Initial data and Auth state
   useEffect(() => {
-    const mockCompanies: Company[] = [
-      {
-        id: 'c1',
-        name: 'Sénégal Fret Express',
-        logo: 'https://picsum.photos/seed/fret1/200/200',
-        banner: 'https://picsum.photos/seed/logistics/1200/400',
-        slogan: 'Votre partenaire logistique fiable',
-        description: 'Spécialiste du transport Chine-Sénégal depuis 10 ans. Nous garantissons la sécurité et la rapidité de vos envois.',
-        addressChina: 'Guangzhou, District de Yuexiu, Rue de la Paix 123',
-        addressAfrica: 'Dakar, Plateau, Avenue Lamine Gueye',
-        countries: ['Sénégal', 'Mali'],
-        verified: true,
-        rating: 4.8,
-        reviewCount: 124,
-        services: [
-          { id: 's1', type: 'maritime', delay: '30-45 jours', priceInfo: 'Basé sur CBM', pricePerUnit: 350000, unit: 'cbm' },
-          { id: 's2', type: 'aérien', delay: '5-10 jours', priceInfo: '6500 FCFA / kg', pricePerUnit: 6500, unit: 'kg' },
-        ],
-        gallery: [
-          'https://picsum.photos/seed/wh1/800/600',
-          'https://picsum.photos/seed/wh2/800/600',
-          'https://picsum.photos/seed/off1/800/600',
-          'https://picsum.photos/seed/off2/800/600'
-        ],
-        totalPackages: 1250,
-        showTotalPackages: true,
-        status: 'open',
-        showPrice: 'full',
-        showReviews: true,
-        contact: {
-          phone: '+221 33 800 00 00',
-          whatsapp: '+221 77 000 00 00',
-          email: 'contact@fret-express.sn'
-        },
-        style: 'minimalist',
-        locations: {
-          africa: true,
-          china: true
+    const initializeApp = async () => {
+      if (!hasSupabaseConfig) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        // 1. Get Auth Session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile) {
+            setUser({
+              id: profile.id,
+              name: profile.name,
+              email: profile.email,
+              role: profile.role,
+              country: profile.country,
+              phone: profile.phone,
+              avatar: profile.avatar,
+              companyId: profile.company_id,
+              subscription: profile.subscription,
+              favorites: profile.favorites,
+              profileProgress: profile.profile_progress,
+              addresses: profile.addresses || []
+            });
+          }
         }
-      },
-      {
-        id: 'c2',
-        name: 'Ivoire Logistique',
-        logo: 'https://picsum.photos/seed/fret2/200/200',
-        description: 'Votre partenaire de confiance pour la Côte d\'Ivoire.',
-        addressChina: 'Yiwu, Marché International, Porte 4',
-        addressAfrica: 'Abidjan, Treichville, Zone 3',
-        countries: ['Côte d\'Ivoire', 'Burkina Faso'],
-        verified: true,
-        rating: 4.5,
-        reviewCount: 89,
-        services: [
-          { id: 's3', type: 'maritime', delay: '25-35 jours', priceInfo: 'Basé sur CBM', pricePerUnit: 320000, unit: 'cbm' },
-          { id: 's4', type: 'express', delay: '3-5 jours', priceInfo: '12000 FCFA / kg', pricePerUnit: 12000, unit: 'kg' },
-        ],
-        gallery: [
-          'https://picsum.photos/seed/wh3/800/600',
-          'https://picsum.photos/seed/wh4/800/600',
-          'https://picsum.photos/seed/off3/800/600'
-        ],
-        totalPackages: 850,
-        showTotalPackages: true
+
+        // 2. Initial Data Fetching
+        const [
+          { data: companiesData },
+          { data: ordersData },
+          { data: messagesData },
+          { data: reviewsData },
+          { data: shipmentsData },
+          { data: notificationsData },
+          { data: ticketsData }
+        ] = await Promise.all([
+          supabase.from('companies').select('*'),
+          supabase.from('orders').select('*').order('created_at', { ascending: false }),
+          supabase.from('messages').select('*').order('timestamp', { ascending: true }),
+          supabase.from('reviews').select('*').order('created_at', { ascending: false }),
+          supabase.from('shipments').select('*').order('created_at', { ascending: false }),
+          supabase.from('notifications').select('*').order('created_at', { ascending: false }),
+          supabase.from('tickets').select('*').order('created_at', { ascending: false })
+        ]);
+
+        if (companiesData) setCompanies(companiesData.map(c => ({
+          ...c,
+          addressChina: c.address_china,
+          addressAfrica: c.address_africa,
+          reviewCount: c.review_count,
+          showTotalPackages: c.show_total_packages,
+          showPrice: c.show_price,
+          showReviews: c.show_reviews
+        })));
+        if (ordersData) setOrders(ordersData.map(o => ({
+          ...o,
+          clientId: o.client_id,
+          clientName: o.client_name,
+          clientPhone: o.client_phone,
+          clientPhone2: o.client_phone2,
+          companyId: o.company_id,
+          companyName: o.company_name,
+          serviceId: o.service_id,
+          serviceType: o.service_type,
+          trackingNumber: o.tracking_number,
+          paymentStatus: o.payment_status,
+          createdAt: o.created_at,
+          updatedAt: o.updated_at,
+          qrCode: o.qr_code,
+          departureDate: o.departure_date,
+          estimatedArrival: o.estimated_arrival
+        })));
+        if (messagesData) setMessages(messagesData.map(m => ({
+          ...m,
+          senderId: m.sender_id,
+          receiverId: m.receiver_id,
+          senderName: m.sender_name,
+          orderId: m.order_id
+        })));
+        if (reviewsData) setReviews(reviewsData.map(r => ({
+          ...r,
+          orderId: r.order_id,
+          companyId: r.company_id,
+          clientId: r.client_id,
+          clientName: r.client_name,
+          createdAt: r.created_at
+        })));
+        if (shipmentsData) setShipments(shipmentsData.map(s => ({
+          ...s,
+          companyId: s.company_id,
+          departureDate: s.departure_date,
+          packageCount: s.package_count,
+          orders: s.order_ids
+        })));
+        if (notificationsData) setNotifications(notificationsData.map(n => ({
+          ...n,
+          userId: n.user_id,
+          createdAt: n.created_at
+        })));
+        
+        if (ticketsData) setTickets(ticketsData.map(t => ({
+          ...t,
+          userId: t.user_id,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at
+        })));
+
+      } catch (error) {
+        console.error('Error initializing Supabase app:', error);
+      } finally {
+        setLoading(false);
       }
-    ];
+    };
 
-    // Set a default user for the preview
-    // Check if we are on a transitaire route to set the correct role
-    const isTransitairePath = window.location.pathname.startsWith('/transitaire');
-    if (isTransitairePath) {
-      const companyId = 'c1';
-      const company = mockCompanies.find(c => c.id === companyId);
-      
-      // Dynamic progress calculation
-      const calculateProgress = (c: Company | undefined) => {
-        if (!c) return 0;
-        let score = 0;
-        if (c.name) score += 10;
-        if (c.logo && !c.logo.includes('ui-avatars')) score += 10;
-        if (c.banner) score += 5;
-        if (c.description && c.description.length > 20) score += 15;
-        if (c.addressChina) score += 10;
-        if (c.addressAfrica) score += 10;
-        if (c.services && c.services.length > 0) score += 15;
-        if (c.contact?.phone) score += 5;
-        if (c.contact?.email) score += 5;
-        if (c.contact?.whatsapp) score += 5;
-        if (c.gallery && c.gallery.length >= 3) score += 5;
-        if (c.locations && (c.locations.africa || c.locations.china)) score += 5;
-        return score;
-      };
+    initializeApp();
 
-      setUser({ 
-        id: 'u2', 
-        name: 'Sénégal Fret Admin', 
-        email: 'admin@fret-express.sn', 
-        role: 'transitaire', 
-        companyId: companyId,
-        subscription: 'pro',
-        profileProgress: calculateProgress(company)
-      });
-    } else {
-      setUser({ id: 'u1', name: 'Jean Client', email: 'jean@exemple.com', role: 'client', favorites: ['c1'] });
-    }
+    if (!hasSupabaseConfig) return;
 
-    setCompanies(mockCompanies);
-
-    // Mock orders
-    setOrders([
-      {
-        id: 'TRX-2026-8842',
-        clientId: 'u1',
-        clientName: 'Jean Client',
-        clientPhone: '+221 77 000 00 00',
-        companyId: 'c1',
-        companyName: 'Sénégal Fret Express',
-        serviceId: 's2',
-        serviceType: 'aérien',
-        status: 'in_transit',
-        weight: 12.5,
-        price: 81250,
-        destination: 'Sénégal',
-        trackingNumber: 'TRX-2026-8842',
-        createdAt: '2026-04-01T10:00:00Z',
-        updatedAt: '2026-04-05T14:30:00Z',
-        description: 'Vêtements et chaussures',
-        qrCode: 'TRX-2026-8842',
-        departureDate: '2026-04-05T10:00:00Z',
-        estimatedArrival: '2026-04-25T10:00:00Z'
-      },
-      {
-        id: 'TRX-2026-3105',
-        clientId: 'u1',
-        clientName: 'Jean Client',
-        clientPhone: '+221 77 000 00 00',
-        companyId: 'c1',
-        companyName: 'Sénégal Fret Express',
-        serviceId: 's2',
-        serviceType: 'aérien',
-        status: 'received',
-        weight: 5.2,
-        price: 33800,
-        destination: 'Sénégal',
-        trackingNumber: 'TRX-2026-3105',
-        createdAt: '2026-04-08T10:00:00Z',
-        updatedAt: '2026-04-10T14:30:00Z',
-        description: 'Électronique',
-        qrCode: 'TRX-2026-3105',
-      },
-      {
-        id: 'TRX-2026-7721',
-        clientId: 'u1',
-        clientName: 'Jean Client',
-        clientPhone: '+221 77 000 00 00',
-        companyId: 'c1',
-        companyName: 'Sénégal Fret Express',
-        serviceId: 's1',
-        serviceType: 'maritime',
-        status: 'received',
-        cbm: 0.45,
-        price: 157500,
-        destination: 'Sénégal',
-        trackingNumber: 'TRX-2026-7721',
-        createdAt: '2026-04-07T10:00:00Z',
-        updatedAt: '2026-04-09T14:30:00Z',
-        description: 'Meubles',
-        qrCode: 'TRX-2026-7721',
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile) {
+          setUser({
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            country: profile.country,
+            phone: profile.phone,
+            avatar: profile.avatar,
+            companyId: profile.company_id,
+            subscription: profile.subscription,
+            favorites: profile.favorites,
+            profileProgress: profile.profile_progress,
+            addresses: profile.addresses || []
+          });
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
       }
-    ]);
+    });
 
-    // Mock messages
-    setMessages([
-      {
-        id: 'm1',
-        senderId: 'c1',
-        receiverId: 'u1',
-        senderName: 'Sénégal Fret Express',
-        content: 'Bonjour ! Votre colis est bien arrivé à notre entrepôt de Guangzhou.',
-        timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-        type: 'text',
-        read: true
-      },
-      {
-        id: 'm2',
-        senderId: 'u1',
-        receiverId: 'c1',
-        content: 'Merci ! Quand est-ce qu\'il sera expédié ?',
-        timestamp: new Date(Date.now() - 3600000 * 23).toISOString(),
-        type: 'text',
-        read: true
-      },
-      {
-        id: 'm3',
-        senderId: 'c1',
-        receiverId: 'u1',
-        senderName: 'Sénégal Fret Express',
-        content: 'Il sera dans le conteneur de ce vendredi.',
-        timestamp: new Date(Date.now() - 3600000 * 22).toISOString(),
-        type: 'text',
-        read: false
-      }
-    ]);
+    const messageChannel = supabase
+      .channel('public:messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const newMessage = payload.new as any;
+        setMessages(prev => [...prev, {
+          id: newMessage.id,
+          senderId: newMessage.sender_id,
+          receiverId: newMessage.receiver_id,
+          senderName: newMessage.sender_name,
+          orderId: newMessage.order_id,
+          content: newMessage.content,
+          timestamp: newMessage.timestamp,
+          type: newMessage.type,
+          read: newMessage.read
+        }]);
+      })
+      .subscribe();
 
-    // Mock shipments
-    setShipments([
-      {
-        id: 'sh1',
-        type: 'air',
-        reference: 'TK-204',
-        departureDate: '2026-04-25T10:00:00Z',
-        route: { from: 'Guangzhou', to: 'Dakar' },
-        capacity: { total: 500, used: 320, unit: 'kg' },
-        status: 'preparation',
-        packageCount: 120,
-        orders: ['o1']
-      },
-      {
-        id: 'sh2',
-        type: 'sea',
-        reference: 'MSC-889',
-        departureDate: '2026-04-27T14:00:00Z',
-        route: { from: 'Shanghai', to: 'Dakar' },
-        capacity: { total: 60, used: 45, unit: 'cbm' },
-        status: 'loaded',
-        packageCount: 85,
-        orders: []
-      }
-    ]);
+    const notifChannel = supabase
+      .channel('public:notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+        const n = payload.new as any;
+        if (n.user_id === user?.id) {
+          setNotifications(prev => [{
+            id: n.id,
+            userId: n.user_id,
+            title: n.title,
+            content: n.content,
+            type: n.type,
+            read: n.read,
+            metadata: n.metadata,
+            createdAt: n.created_at
+          }, ...prev]);
+        }
+      })
+      .subscribe();
+
+    const orderChannel = supabase
+      .channel('public:orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const o = payload.new as any;
+          setOrders(prev => [{
+            id: o.id,
+            clientId: o.client_id,
+            clientName: o.client_name,
+            clientPhone: o.client_phone,
+            companyId: o.company_id,
+            companyName: o.company_name,
+            serviceId: o.service_id,
+            serviceType: o.service_type,
+            status: o.status,
+            trackingNumber: o.tracking_number,
+            paymentStatus: o.payment_status,
+            createdAt: o.created_at,
+            updatedAt: o.updated_at
+          } as any, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          const o = payload.new as any;
+          setOrders(prev => prev.map(order => order.id === o.id ? {
+            ...order,
+            status: o.status,
+            paymentStatus: o.payment_status,
+            updatedAt: o.updated_at
+          } : order));
+        }
+      })
+      .subscribe();
+
+    const ticketChannel = supabase
+      .channel('public:tickets')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const t = payload.new as any;
+          setTickets(prev => [{
+            id: t.id,
+            userId: t.user_id,
+            subject: t.subject,
+            content: t.content,
+            status: t.status,
+            priority: t.priority,
+            category: t.category,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at
+          }, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          const t = payload.new as any;
+          setTickets(prev => prev.map(ticket => ticket.id === t.id ? {
+            ...ticket,
+            status: t.status,
+            updatedAt: t.updated_at
+          } : ticket));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      authSubscription.unsubscribe();
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(notifChannel);
+      supabase.removeChannel(orderChannel);
+      supabase.removeChannel(ticketChannel);
+    };
   }, []);
 
-  const addOrder = (order: Order) => setOrders(prev => [order, ...prev]);
-  const updateOrder = (orderId: string, updates: Partial<Order>) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates, updatedAt: new Date().toISOString() } : o));
-  };
-
-  const addReview = (review: Review) => {
-    setReviews(prev => [review, ...prev]);
-    updateOrder(review.orderId, { reviewed: true });
+  const addTicket = async (ticket: any) => {
+    if (!user) return;
+    const { error } = await supabase.from('tickets').insert([{
+      user_id: user.id,
+      subject: ticket.subject,
+      content: ticket.content,
+      category: ticket.category,
+      priority: ticket.priority
+    }]);
     
-    // Update company rating
-    setCompanies(prev => prev.map(c => {
-      if (c.id === review.companyId) {
-        const newCount = c.reviewCount + 1;
-        const newRating = ((c.rating * c.reviewCount) + review.rating) / newCount;
-        return { ...c, rating: Number(newRating.toFixed(1)), reviewCount: newCount };
-      }
-      return c;
-    }));
+    if (!error) {
+      // Tickets are handled via realtime subscription for the list
+    }
   };
+  const addOrder = async (order: Order) => {
+    const { error } = await supabase.from('orders').insert([{
+      id: order.id,
+      client_id: order.clientId,
+      client_name: order.clientName,
+      client_phone: order.clientPhone,
+      client_phone2: order.clientPhone2,
+      company_id: order.companyId,
+      company_name: order.companyName,
+      service_id: order.serviceId,
+      service_type: order.serviceType,
+      status: order.status,
+      weight: order.weight,
+      cbm: order.cbm,
+      dimensions: order.dimensions,
+      price: order.price,
+      destination: order.destination,
+      tracking_number: order.trackingNumber,
+      description: order.description,
+      qr_code: order.qrCode,
+      departure_date: order.departureDate,
+      estimated_arrival: order.estimatedArrival,
+      payment_status: order.paymentStatus || 'unpaid'
+    }]);
 
-  const addMessage = (message: Message) => setMessages(prev => [...prev, message]);
-  
-  const markAsRead = (senderId: string) => {
-    setMessages(prev => prev.map(m => 
-      (m.senderId === senderId && m.receiverId === user?.id) ? { ...m, read: true } : m
-    ));
-  };
-  
-  const updateSubscription = (plan: string) => {
-    if (user && user.role === 'transitaire') {
-      setUser({ ...user, subscription: plan });
+    if (!error) {
+      setOrders(prev => [order, ...prev]);
+      
+      const { data: company } = await supabase.from('companies').select('owner_id').eq('id', order.companyId).single();
+      if (company?.owner_id) {
+        addNotification({
+          userId: company.owner_id,
+          title: "Nouvelle commande",
+          content: `Vous avez reçu une nouvelle commande de ${order.clientName}.`,
+          type: 'order',
+          metadata: { orderId: order.id }
+        });
+      }
     }
   };
 
-  const toggleFavorite = (companyId: string) => {
+  const updateOrder = async (orderId: string, updates: Partial<Order>) => {
+    const dbUpdates: any = { ...updates };
+    if (updates.clientId) { dbUpdates.client_id = updates.clientId; delete dbUpdates.clientId; }
+    if (updates.companyId) { dbUpdates.company_id = updates.companyId; delete dbUpdates.companyId; }
+    if (updates.serviceId) { dbUpdates.service_id = updates.serviceId; delete dbUpdates.serviceId; }
+    if (updates.trackingNumber) { dbUpdates.tracking_number = updates.trackingNumber; delete dbUpdates.trackingNumber; }
+    if (updates.departureDate) { dbUpdates.departure_date = updates.departureDate; delete dbUpdates.departureDate; }
+    if (updates.estimatedArrival) { dbUpdates.estimated_arrival = updates.estimatedArrival; delete dbUpdates.estimatedArrival; }
+    
+    dbUpdates.updated_at = new Date().toISOString();
+
+    const { error } = await supabase.from('orders').update(dbUpdates).eq('id', orderId);
+    if (!error) {
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates, updatedAt: dbUpdates.updated_at } : o));
+      
+      // Notify the client if status changed
+      if (updates.status) {
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          addNotification({
+            userId: order.clientId,
+            title: "Mise à jour de votre colis",
+            content: `Votre colis ${orderId} est désormais : ${updates.status}.`,
+            type: 'order',
+            metadata: { orderId }
+          });
+        }
+      }
+    }
+  };
+
+  const addReview = async (review: Review) => {
+    const { error } = await supabase.from('reviews').insert([{
+      id: review.id,
+      order_id: review.orderId,
+      company_id: review.companyId,
+      client_id: review.clientId,
+      client_name: review.clientName,
+      rating: review.rating,
+      comment: review.comment,
+      criteria: review.criteria
+    }]);
+
+    if (!error) {
+      setReviews(prev => [review, ...prev]);
+      updateOrder(review.orderId, { reviewed: true });
+      
+      const company = companies.find(c => c.id === review.companyId);
+      if (company) {
+        const newCount = company.reviewCount + 1;
+        const newRating = ((company.rating * company.reviewCount) + review.rating) / newCount;
+        const finalRating = Number(newRating.toFixed(1));
+        
+        await supabase.from('companies').update({
+          rating: finalRating,
+          review_count: newCount
+        }).eq('id', company.id);
+
+        setCompanies(prev => prev.map(c => 
+          c.id === review.companyId ? { ...c, rating: finalRating, reviewCount: newCount } : c
+        ));
+      }
+    }
+  };
+
+  const addMessage = async (message: Message) => {
+    const { error } = await supabase.from('messages').insert([{
+      id: message.id,
+      sender_id: message.senderId,
+      receiver_id: message.receiverId,
+      sender_name: message.senderName,
+      order_id: message.orderId,
+      content: message.content,
+      type: message.type,
+      read: message.read,
+      timestamp: message.timestamp
+    }]);
+
+    if (!error) {
+      setMessages(prev => [...prev, message]);
+      
+      // Notify the receiver
+      addNotification({
+        userId: message.receiverId,
+        title: "Nouveau message",
+        content: `Vous avez reçu un message de ${message.senderName}.`,
+        type: 'message',
+        metadata: { orderId: message.orderId }
+      });
+    }
+  };
+  
+  const markAsRead = async (senderId: string) => {
+    const { error } = await supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('sender_id', senderId)
+      .eq('receiver_id', user?.id || '');
+
+    if (!error) {
+      setMessages(prev => prev.map(m => 
+        (m.senderId === senderId && m.receiverId === user?.id) ? { ...m, read: true } : m
+      ));
+    }
+  };
+  
+  const updateSubscription = async (plan: string) => {
+    if (user && user.role === 'transitaire') {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription: plan })
+        .eq('id', user.id);
+      
+      if (!error) setUser({ ...user, subscription: plan });
+    }
+  };
+
+  const toggleFavorite = async (companyId: string) => {
     if (!user) return;
     const currentFavorites = user.favorites || [];
     const isFavorite = currentFavorites.includes(companyId);
@@ -322,56 +499,198 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ? currentFavorites.filter(id => id !== companyId)
       : [...currentFavorites, companyId];
     
-    setUser({ ...user, favorites: newFavorites });
+    const { error } = await supabase
+      .from('profiles')
+      .update({ favorites: newFavorites })
+      .eq('id', user.id);
+
+    if (!error) setUser({ ...user, favorites: newFavorites });
   };
 
-  const addShipment = (shipment: Shipment) => setShipments(prev => [shipment, ...prev]);
-  const updateShipment = (shipmentId: string, updates: Partial<Shipment>) => {
-    setShipments(prev => prev.map(s => s.id === shipmentId ? { ...s, ...updates } : s));
+  const addShipment = async (shipment: Shipment) => {
+    const { error } = await supabase.from('shipments').insert([{
+      id: shipment.id,
+      company_id: shipment.companyId,
+      type: shipment.type,
+      reference: shipment.reference,
+      departure_date: shipment.departureDate,
+      route: shipment.route,
+      capacity: shipment.capacity,
+      status: shipment.status,
+      package_count: shipment.packageCount,
+      order_ids: shipment.orders
+    }]);
+
+    if (!error) setShipments(prev => [shipment, ...prev]);
   };
 
-  const addNotification = (notif: any) => {
-    setNotifications(prev => [{ id: Date.now().toString(), ...notif, read: false, time: 'À l\'instant' }, ...prev]);
+  const updateShipment = async (shipmentId: string, updates: Partial<Shipment>) => {
+    const dbUpdates: any = { ...updates };
+    if (updates.companyId) { dbUpdates.company_id = updates.companyId; delete dbUpdates.companyId; }
+    if (updates.departureDate) { dbUpdates.departure_date = updates.departureDate; delete dbUpdates.departureDate; }
+    if (updates.packageCount) { dbUpdates.package_count = updates.packageCount; delete dbUpdates.packageCount; }
+    if (updates.orders) { dbUpdates.order_ids = updates.orders; delete dbUpdates.orders; }
+
+    const { error } = await supabase.from('shipments').update(dbUpdates).eq('id', shipmentId);
+    if (!error) setShipments(prev => prev.map(s => s.id === shipmentId ? { ...s, ...updates } : s));
   };
 
-  const markNotificationAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  };
+  const addNotification = async (notif: any) => {
+    const { data: newNotif, error } = await supabase
+      .from('notifications')
+      .insert([{
+        user_id: notif.userId,
+        title: notif.title,
+        content: notif.content,
+        type: notif.type || 'system',
+        metadata: notif.metadata || {},
+        read: false
+      }])
+      .select()
+      .single();
 
-  const markAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const updateCompany = (companyId: string, updates: Partial<Company>) => {
-    setCompanies(prev => prev.map(c => {
-      if (c.id === companyId) {
-        const updatedCompany = { ...c, ...updates };
-        
-        // Update user progress if this is the user's company
-        if (user && user.companyId === companyId) {
-          const calculateProgress = (comp: Company) => {
-            let score = 0;
-            if (comp.name) score += 10;
-            if (comp.logo && !comp.logo.includes('ui-avatars')) score += 10;
-            if (comp.banner) score += 5;
-            if (comp.description && comp.description.length > 20) score += 15;
-            if (comp.addressChina) score += 10;
-            if (comp.addressAfrica) score += 10;
-            if (comp.services && comp.services.length > 0) score += 15;
-            if (comp.contact?.phone) score += 5;
-            if (comp.contact?.email) score += 5;
-            if (comp.contact?.whatsapp) score += 5;
-            if (comp.gallery && comp.gallery.length >= 3) score += 5;
-            if (comp.locations && (comp.locations.africa || comp.locations.china)) score += 5;
-            return Math.min(score, 100);
-          };
-          setUser({ ...user, profileProgress: calculateProgress(updatedCompany) });
-        }
-        
-        return updatedCompany;
+    if (!error && newNotif) {
+      if (newNotif.user_id === user?.id) {
+        setNotifications(prev => [{
+          id: newNotif.id,
+          userId: newNotif.user_id,
+          title: newNotif.title,
+          content: newNotif.content,
+          type: newNotif.type,
+          read: newNotif.read,
+          metadata: newNotif.metadata,
+          createdAt: newNotif.created_at
+        }, ...prev]);
       }
-      return c;
-    }));
+    }
+  };
+
+  const markNotificationAsRead = async (id: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', id);
+    
+    if (!error) {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', user.id);
+    
+    if (!error) {
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    }
+  };
+
+  const updateCompany = async (companyId: string, updates: Partial<Company>) => {
+    // Transform to DB schema
+    const dbUpdates: any = { ...updates };
+    if (updates.addressChina) { dbUpdates.address_china = updates.addressChina; delete dbUpdates.addressChina; }
+    if (updates.addressAfrica) { dbUpdates.address_africa = updates.addressAfrica; delete dbUpdates.addressAfrica; }
+    if (updates.showTotalPackages) { dbUpdates.show_total_packages = updates.showTotalPackages; delete dbUpdates.showTotalPackages; }
+    if (updates.showPrice) { dbUpdates.show_price = updates.showPrice; delete dbUpdates.showPrice; }
+    if (updates.showReviews) { dbUpdates.show_reviews = updates.showReviews; delete dbUpdates.showReviews; }
+    
+    dbUpdates.updated_at = new Date().toISOString();
+
+    const { error } = await supabase.from('companies').update(dbUpdates).eq('id', companyId);
+    
+    if (!error) {
+      setCompanies(prev => prev.map(c => {
+        if (c.id === companyId) {
+          const updatedCompany = { ...c, ...updates };
+          
+          if (user && user.companyId === companyId) {
+            const calculateProgress = (comp: Company) => {
+              let score = 0;
+              if (comp.name) score += 10;
+              if (comp.logo && !comp.logo.includes('ui-avatars')) score += 10;
+              if (comp.banner) score += 5;
+              if (comp.description && comp.description.length > 20) score += 15;
+              if (comp.addressChina) score += 10;
+              if (comp.addressAfrica) score += 10;
+              if (comp.services && comp.services.length > 0) score += 15;
+              if (comp.contact?.phone) score += 5;
+              if (comp.contact?.email) score += 5;
+              if (comp.contact?.whatsapp) score += 5;
+              if (comp.gallery && comp.gallery.length >= 3) score += 5;
+              if (comp.locations && (comp.locations.africa || comp.locations.china)) score += 5;
+              return Math.min(score, 100);
+            };
+            const newProgress = calculateProgress(updatedCompany);
+            // Update profile progress in Supabase too
+            supabase.from('profiles').update({ profile_progress: newProgress }).eq('id', user.id);
+            setUser({ ...user, profileProgress: newProgress });
+          }
+          
+          return updatedCompany;
+        }
+        return c;
+      }));
+    }
+  };
+
+  const updateProfile = async (updates: Partial<User>) => {
+    if (!user) return;
+    
+    // Transform to DB schema
+    const dbUpdates: any = { ...updates };
+    if (updates.profileProgress !== undefined) { 
+      dbUpdates.profile_progress = updates.profileProgress; 
+      delete dbUpdates.profileProgress; 
+    }
+    if (updates.companyId !== undefined) {
+      dbUpdates.company_id = updates.companyId;
+      delete dbUpdates.companyId;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(dbUpdates)
+      .eq('id', user.id);
+
+    if (!error) {
+      setUser({ ...user, ...updates });
+    } else {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
+  const addCompany = async (company: Company) => {
+    const { error } = await supabase.from('companies').insert([{
+      id: company.id,
+      name: company.name,
+      logo: company.logo,
+      banner: company.banner,
+      slogan: company.slogan,
+      description: company.description,
+      address_china: company.addressChina,
+      address_africa: company.addressAfrica,
+      countries: company.countries,
+      verified: company.verified,
+      rating: company.rating,
+      review_count: company.reviewCount,
+      services: company.services,
+      gallery: company.gallery,
+      total_packages: company.totalPackages,
+      show_total_packages: company.showTotalPackages,
+      status: company.status,
+      show_price: company.showPrice,
+      show_reviews: company.showReviews,
+      contact: company.contact,
+      style: company.style,
+      locations: company.locations,
+      owner_id: user?.id
+    }]);
+
+    if (!error) setCompanies(prev => [company, ...prev]);
   };
 
   const formatPrice = (price: number) => {
@@ -430,14 +749,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return translations[language]?.[key] || translations['Français (FR)'][key] || key;
   };
 
-  const logout = () => setUser(null);
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   return (
     <AppContext.Provider value={{ 
-      user, setUser, companies, orders, messages, reviews, shipments, notifications,
+      user, setUser, companies, orders, messages, reviews, shipments, notifications, tickets,
       addOrder, updateOrder, addReview, addMessage, markAsRead, updateSubscription, toggleFavorite, 
       addShipment, updateShipment, addNotification, markNotificationAsRead, markAllNotificationsAsRead, 
-      updateCompany, language, setLanguage, currency, setCurrency, formatPrice, t, logout 
+      updateCompany, updateProfile, addCompany, language, setLanguage, currency, setCurrency, formatPrice, t, logout, sidebarCollapsed, setSidebarCollapsed, loading
     }}>
       {children}
     </AppContext.Provider>

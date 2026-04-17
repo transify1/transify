@@ -106,7 +106,7 @@ const TrackingMap = ({ progress, type }: { progress: number, type: 'maritime' | 
 );
 
 export default function ClientDashboard() {
-  const { user, companies, orders, toggleFavorite, notifications, markAllNotificationsAsRead, formatPrice, t } = useApp();
+  const { user, companies, orders, toggleFavorite, notifications, markNotificationAsRead, markAllNotificationsAsRead, formatPrice, t, sidebarCollapsed } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const activeOrder = orders.find(o => o.status === 'in_transit' || o.status === 'received');
@@ -142,12 +142,27 @@ export default function ClientDashboard() {
     }
   };
 
+  const getStatusProgress = (status: string) => {
+    switch (status) {
+      case 'pending': return 10;
+      case 'received': return 35;
+      case 'loaded': return 50;
+      case 'in_transit': return 75;
+      case 'arrived': return 90;
+      case 'delivered': return 100;
+      default: return 0;
+    }
+  };
+
    return (
     <div className="min-h-screen bg-white pb-24 lg:pb-0 fluid-bg">
       <ClientSidebar />
 
       {/* Main Content */}
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-7xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-7xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex flex-col md:flex-row justify-between items-end gap-6 mb-10">
           <div>
             <h1 className="text-[28px] font-bold text-slate-900 tracking-tight mb-1">{t('welcome')}, {user?.name.split(' ')[0]}</h1>
@@ -188,6 +203,7 @@ export default function ClientDashboard() {
                         notifications.map((notif) => (
                           <div 
                             key={notif.id} 
+                            onClick={() => markNotificationAsRead(notif.id)}
                             className={cn(
                               "p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer relative",
                               !notif.read && "bg-blue-50/30"
@@ -195,8 +211,8 @@ export default function ClientDashboard() {
                           >
                             {!notif.read && <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-apple-blue rounded-full" />}
                             <p className="text-[15px] font-bold text-slate-900 tracking-tight mb-0.5">{notif.title}</p>
-                            <p className="text-[13px] text-slate-500 font-normal leading-snug mb-1">{notif.message}</p>
-                            <p className="text-[11px] font-medium text-slate-400">{notif.time}</p>
+                            <p className="text-[13px] text-slate-500 font-normal leading-snug mb-1">{notif.content}</p>
+                            <p className="text-[11px] font-medium text-slate-400">{formatDate(notif.createdAt)}</p>
                           </div>
                         ))
                       ) : (
@@ -246,7 +262,7 @@ export default function ClientDashboard() {
                     </div>
                   </div>
 
-                  <TrackingMap progress={activeOrder.status === 'in_transit' ? 65 : 15} type={activeOrder.serviceType === 'aérien' ? 'aérien' : 'maritime'} />
+                  <TrackingMap progress={getStatusProgress(activeOrder.status)} type={activeOrder.serviceType === 'aérien' ? 'aérien' : 'maritime'} />
 
                   <div className="grid md:grid-cols-3 gap-4 pt-2">
                     <div className="p-4 bg-slate-50/50 rounded-[16px] flex flex-col gap-0.5">

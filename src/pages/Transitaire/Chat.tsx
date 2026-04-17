@@ -14,7 +14,7 @@ import { cn } from '../../lib/utils';
 export default function TransitaireChat() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, messages, orders, addMessage, markAsRead } = useApp();
+  const { user, messages, orders, addMessage, markAsRead, sidebarCollapsed } = useApp();
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -35,8 +35,8 @@ export default function TransitaireChat() {
   };
 
   const chatMessages = messages.filter(m => 
-    (m.senderId === id && m.receiverId === user?.companyId) || 
-    (m.senderId === user?.companyId && m.receiverId === id)
+    (m.senderId === id && m.receiverId === user?.id) || 
+    (m.senderId === user?.id && m.receiverId === id)
   ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function TransitaireChat() {
 
     const message = {
       id: Date.now().toString(),
-      senderId: user?.companyId || '',
+      senderId: user?.id || '',
       receiverId: id || '',
       senderName: user?.name,
       content: newMessage,
@@ -72,7 +72,10 @@ export default function TransitaireChat() {
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col h-screen overflow-hidden">
       <TransitaireSidebar />
       
-      <div className="lg:ml-72 flex flex-col h-full overflow-hidden">
+      <div className={cn(
+        "flex flex-col h-full overflow-hidden transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100/50 p-4 flex items-center justify-between z-10 sticky top-0">
           <div className="flex items-center gap-3">

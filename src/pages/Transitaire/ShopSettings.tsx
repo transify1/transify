@@ -14,7 +14,7 @@ import TransitaireSidebar from '../../components/Transitaire/Sidebar';
 import { useApp } from '../../context/AppContext';
 
 export default function ShopSettings() {
-  const { user, companies, updateCompany } = useApp();
+  const { user, companies, updateCompany, sidebarCollapsed } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'identity';
@@ -75,6 +75,55 @@ export default function ShopSettings() {
     addressAfrica: company?.addressAfrica || ""
   });
 
+  // Sync state with company data from context
+  useEffect(() => {
+    if (company) {
+      setShopData({
+        name: company.name || "",
+        slogan: company.slogan || "",
+        description: company.description || "",
+        status: company.status || 'open',
+        showPrice: company.showPrice || 'full',
+        showReviews: company.showReviews ?? true,
+        contact: {
+          phone: company.contact?.phone || "",
+          whatsapp: company.contact?.whatsapp || "",
+          email: company.contact?.email || ""
+        },
+        services: {
+          express: {
+            active: company.services.find(s => s.type === 'express')?.active ?? false,
+            delay: company.services.find(s => s.type === 'express')?.delay || '3-5 jours',
+            pricePerUnit: company.services.find(s => s.type === 'express')?.pricePerUnit || 0,
+            priceInfo: company.services.find(s => s.type === 'express')?.priceInfo || 'À définir',
+            unit: company.services.find(s => s.type === 'express')?.unit || 'kg'
+          },
+          aérien: {
+            active: company.services.find(s => s.type === 'aérien')?.active ?? false,
+            delay: company.services.find(s => s.type === 'aérien')?.delay || '7-10 jours',
+            pricePerUnit: company.services.find(s => s.type === 'aérien')?.pricePerUnit || 0,
+            priceInfo: company.services.find(s => s.type === 'aérien')?.priceInfo || 'À définir',
+            unit: company.services.find(s => s.type === 'aérien')?.unit || 'kg'
+          },
+          maritime: {
+            active: company.services.find(s => s.type === 'maritime')?.active ?? false,
+            delay: company.services.find(s => s.type === 'maritime')?.delay || '30-45 jours',
+            pricePerUnit: company.services.find(s => s.type === 'maritime')?.pricePerUnit || 0,
+            priceInfo: company.services.find(s => s.type === 'maritime')?.priceInfo || 'À définir',
+            unit: company.services.find(s => s.type === 'maritime')?.unit || 'cbm'
+          }
+        },
+        style: company.style || 'minimalist',
+        locations: company.locations || { africa: true, china: true },
+        gallery: company.gallery || [],
+        logo: company.logo || `https://ui-avatars.com/api/?name=${company.name}&background=random`,
+        banner: company.banner || 'https://picsum.photos/seed/logistics/1200/400',
+        addressChina: company.addressChina || "",
+        addressAfrica: company.addressAfrica || ""
+      });
+    }
+  }, [company?.id]);
+
   const [activeTab, setActiveTab] = useState<'identity' | 'presentation' | 'services' | 'contact'>(initialTab);
 
   useEffect(() => {
@@ -119,7 +168,8 @@ export default function ShopSettings() {
           active: edited.active,
           delay: edited.delay,
           pricePerUnit: Number(edited.pricePerUnit),
-          priceInfo: edited.priceInfo
+          priceInfo: edited.priceInfo,
+          unit: edited.unit as 'kg' | 'cbm'
         };
       }
       return s;
@@ -182,7 +232,10 @@ export default function ShopSettings() {
     <div className="min-h-screen bg-white fluid-bg">
       <TransitaireSidebar />
       
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-7xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-7xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-1.5">
@@ -199,9 +252,9 @@ export default function ShopSettings() {
               onClick={() => {
                 // Map services for preview
                 const previewServices = company?.services.map(s => {
-                  if (s.type === 'express') return { ...s, active: shopData.services.air_express };
-                  if (s.type === 'aérien') return { ...s, active: shopData.services.air_fret };
-                  if (s.type === 'maritime') return { ...s, active: shopData.services.maritime };
+                  if (s.type === 'express') return { ...s, active: shopData.services.express.active };
+                  if (s.type === 'aérien') return { ...s, active: shopData.services.aérien.active };
+                  if (s.type === 'maritime') return { ...s, active: shopData.services.maritime.active };
                   return s;
                 });
 
@@ -354,6 +407,17 @@ export default function ShopSettings() {
                         </div>
                       </div>
                     </div>
+
+                    <div className="flex justify-end pt-4">
+                      <button 
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="apple-button-primary flex items-center gap-2 !py-3 !px-8 !text-[12px] !font-bold uppercase tracking-widest"
+                      >
+                        {isSaving ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Save size={16} /></motion.div> : <Save size={16} />}
+                        Enregistrer l'identité
+                      </button>
+                    </div>
                   </section>
                 </motion.div>
               )}
@@ -427,6 +491,17 @@ export default function ShopSettings() {
                         <Plus size={24} className="group-hover:scale-110 transition-transform" />
                         <span className="text-[9px] font-semibold uppercase tracking-widest">Upload</span>
                       </div>
+                    </div>
+
+                    <div className="flex justify-end pt-8">
+                      <button 
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="apple-button-primary flex items-center gap-2 !py-3 !px-8 !text-[12px] !font-bold uppercase tracking-widest"
+                      >
+                        {isSaving ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Save size={16} /></motion.div> : <Save size={16} />}
+                        Enregistrer la présentation
+                      </button>
                     </div>
                   </section>
                 </motion.div>
@@ -541,6 +616,17 @@ export default function ShopSettings() {
                         </div>
                       )})}
                     </div>
+
+                    <div className="flex justify-end pt-8">
+                      <button 
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="apple-button-primary flex items-center gap-2 !py-3 !px-8 !text-[12px] !font-bold uppercase tracking-widest"
+                      >
+                        {isSaving ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Save size={16} /></motion.div> : <Save size={16} />}
+                        Enregistrer les services
+                      </button>
+                    </div>
                   </section>
 
                   {/* Pricing Display */}
@@ -572,6 +658,17 @@ export default function ShopSettings() {
                           <p className="text-[11px] text-slate-500 font-normal leading-tight">{opt.desc}</p>
                         </button>
                       ))}
+                    </div>
+
+                    <div className="flex justify-end pt-8">
+                      <button 
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="apple-button-primary flex items-center gap-2 !py-3 !px-8 !text-[12px] !font-bold uppercase tracking-widest"
+                      >
+                        {isSaving ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Save size={16} /></motion.div> : <Save size={16} />}
+                        Enregistrer les préférences d'affichage
+                      </button>
                     </div>
                   </section>
                 </motion.div>
@@ -702,6 +799,17 @@ export default function ShopSettings() {
                         </div>
                       </div>
                     </div>
+
+                    <div className="flex justify-end pt-4">
+                      <button 
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="apple-button-primary flex items-center gap-2 !py-3 !px-8 !text-[12px] !font-bold uppercase tracking-widest"
+                      >
+                        {isSaving ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Save size={16} /></motion.div> : <Save size={16} />}
+                        Enregistrer le contact
+                      </button>
+                    </div>
                   </section>
                 </motion.div>
               )}
@@ -742,9 +850,9 @@ export default function ShopSettings() {
                 <button 
                   onClick={() => {
                     const previewServices = company?.services.map(s => {
-                      if (s.type === 'express') return { ...s, active: shopData.services.air_express };
-                      if (s.type === 'aérien') return { ...s, active: shopData.services.air_fret };
-                      if (s.type === 'maritime') return { ...s, active: shopData.services.maritime };
+                      if (s.type === 'express') return { ...s, active: shopData.services.express.active };
+                      if (s.type === 'aérien') return { ...s, active: shopData.services.aérien.active };
+                      if (s.type === 'maritime') return { ...s, active: shopData.services.maritime.active };
                       return s;
                     });
 

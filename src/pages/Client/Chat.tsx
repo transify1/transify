@@ -30,15 +30,15 @@ export default function ClientChat() {
   ];
 
   const chatMessages = messages.filter(m => 
-    (m.senderId === id && m.receiverId === user?.id) || 
-    (m.senderId === user?.id && m.receiverId === id)
+    (m.senderId === company.owner_id && m.receiverId === user?.id) || 
+    (m.senderId === user?.id && m.receiverId === company.owner_id)
   ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   useEffect(() => {
-    if (id) {
-      markAsRead(id);
+    if (company?.owner_id) {
+      markAsRead(company.owner_id);
     }
-  }, [id, messages.length]);
+  }, [company?.owner_id, messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,12 +57,13 @@ export default function ClientChat() {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !company.owner_id) return;
 
     const message = {
       id: Date.now().toString(),
       senderId: user?.id || '',
-      receiverId: id || '',
+      receiverId: company.owner_id, // Use owner_id instead of company.id
+      senderName: user?.name,
       content: newMessage,
       timestamp: new Date().toISOString(),
       type: 'text' as const,

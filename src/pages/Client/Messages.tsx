@@ -37,19 +37,20 @@ const BottomNav = () => (
 );
 
 export default function ClientMessages() {
-  const { user, messages, companies } = useApp();
+  const { user, messages, companies, sidebarCollapsed } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
   // Group messages by conversation (with companies)
   const conversations = companies.map(company => {
+    const ownerId = company.owner_id || company.id; // Fallback to id if owner_id missing (should not happen)
     const companyMessages = messages.filter(m => 
-      (m.senderId === company.id && m.receiverId === user?.id) || 
-      (m.senderId === user?.id && m.receiverId === company.id)
+      (m.senderId === ownerId && m.receiverId === user?.id) || 
+      (m.senderId === user?.id && m.receiverId === ownerId)
     ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     const lastMessage = companyMessages[0];
-    const unreadCount = companyMessages.filter(m => m.senderId === company.id && !m.read).length;
+    const unreadCount = companyMessages.filter(m => m.senderId === ownerId && !m.read).length;
 
     return {
       company,
@@ -64,8 +65,10 @@ export default function ClientMessages() {
   return (
     <div className="min-h-screen bg-white pb-24 lg:pb-0 fluid-bg">
       <ClientSidebar />
-
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-4xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-4xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-[28px] font-bold text-slate-900 tracking-tight">Messages</h1>

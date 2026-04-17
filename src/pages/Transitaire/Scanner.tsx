@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { supabase } from '../../lib/supabase';
 import { useApp } from '../../context/AppContext';
 import { 
   QrCode, ArrowLeft, Zap, Package, 
@@ -14,10 +15,11 @@ import { cn } from '../../lib/utils';
 
 export default function TransitaireScanner() {
   const navigate = useNavigate();
-  const { orders, updateOrder } = useApp();
+  const { user, orders, updateOrder, companies, sidebarCollapsed } = useApp();
   const [isScanning, setIsScanning] = useState(true);
   const [scannedOrder, setScannedOrder] = useState<any>(null);
   const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
   const [finalWeight, setFinalWeight] = useState('');
   const [finalLength, setFinalLength] = useState('');
   const [finalWidth, setFinalWidth] = useState('');
@@ -44,64 +46,73 @@ export default function TransitaireScanner() {
     };
   }, [isScanning, scannedOrder]);
 
-  function onScanSuccess(decodedText: string) {
+  async function onScanSuccess(decodedText: string) {
     try {
-      const data = JSON.parse(decodedText);
-      const orderId = data.id_commande || data.orderId;
+      // The QR code now contains ONLY the order ID for security
+      const orderId = decodedText.trim();
       
-      if (orderId) {
-        // Find the order in our state
-        const order = orders.find(o => o.id === orderId);
-        if (order) {
-          setScannedOrder(order);
-          setFinalWeight(order.weight?.toString() || '');
-          if (order.dimensions) {
-            setFinalLength(order.dimensions.length.toString());
-            setFinalWidth(order.dimensions.width.toString());
-            setFinalHeight(order.dimensions.height.toString());
-          }
-          setStatus('success');
-          setIsScanning(false);
-          if (scannerRef.current) {
-            scannerRef.current.clear();
-          }
-        } else {
-          // If not found in state, we use the data from QR
-          setScannedOrder({
-            id: orderId,
-            clientName: data.nom,
-            clientPhone: data.telephone,
-            serviceType: data.type_transport,
-            destination: data.adresse,
-            weight: parseFloat(data.poids) || undefined,
-            dimensions: data.dimensions !== "N/A" ? data.dimensions : undefined,
-          });
-          setFinalWeight(data.poids !== "N/A" ? data.poids : '');
-          if (data.dimensions && data.dimensions !== "N/A") {
-            setFinalLength(data.dimensions.length.toString());
-            setFinalWidth(data.dimensions.width.toString());
-            setFinalHeight(data.dimensions.height.toString());
-          }
-          setStatus('success');
-          setIsScanning(false);
-          if (scannerRef.current) {
-            scannerRef.current.clear();
-          }
-        }
+      setStatus('scanning');
+      
+      // 1. Check if the order belongs to this transitaire
+      const { data: order, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (error || !order) {
+        setErrorMessage("Colis introuvable ou vous n'avez pas l'autorisation d'accéder à ces informations.");
+        setStatus('error');
+        return;
+      }
+
+      // 2. Extra security check: verify company ID match
+      if (order.company_id !== user?.companyId) {
+        setErrorMessage("Accès Refusé : Ce colis appartient à une autre compagnie de transport.");
+        setStatus('error');
+        return;
+      }
+
+      // 3. Mapping data for UI
+      const mappedOrder = {
+        ...order,
+        clientId: order.client_id,
+        clientName: order.client_name,
+        clientPhone: order.client_phone,
+        companyId: order.company_id,
+        serviceType: order.service_type,
+        weight: order.weight,
+        dimensions: order.dimensions,
+      };
+
+      setScannedOrder(mappedOrder);
+      setFinalWeight(order.weight?.toString() || '');
+      if (order.dimensions) {
+        setFinalLength(order.dimensions.length?.toString() || '');
+        setFinalWidth(order.dimensions.width?.toString() || '');
+        setFinalHeight(order.dimensions.height?.toString() || '');
+      }
+      
+      setStatus('success');
+      setIsScanning(false);
+      if (scannerRef.current) {
+        scannerRef.current.clear();
       }
     } catch (e) {
-      console.error("Invalid QR Code data", e);
+      console.error("Scanning process error", e);
+      setErrorMessage("Désolé, une erreur est survenue lors de la lecture du code.");
       setStatus('error');
     }
   }
 
   function onScanFailure(error: any) {
-    // console.warn(`Code scan error = ${error}`);
+    // Standard scanning attempts, ignorable
   }
 
   const resetScanner = () => {
     setScannedOrder(null);
     setStatus('idle');
+    setErrorMessage('');
     setIsScanning(true);
     setFinalWeight('');
     setFinalLength('');
@@ -113,27 +124,28 @@ export default function TransitaireScanner() {
   const calculateFinalPrice = () => {
     if (!scannedOrder) return 0;
     
-    // We need to find the company and service to get the rate
-    const company = orders.find(o => o.id === scannedOrder.id)?.companyId;
-    // For mock purposes, let's assume some rates if we can't find them
-    const rateKg = 6500;
-    const rateCbm = 350000;
+    // Get actual rates from company data
+    const company = companies.find(c => c.id === scannedOrder.companyId);
+    if (!company) return 0;
+
+    const matchingService = company.services?.find((s: any) => s.type === scannedOrder.serviceType);
+    const rate = matchingService?.pricePerUnit || 0;
 
     if (scannedOrder.serviceType === 'maritime') {
       const l = parseFloat(finalLength) || 0;
       const w = parseFloat(finalWidth) || 0;
       const h = parseFloat(finalHeight) || 0;
       const cbm = l * w * h;
-      return cbm * rateCbm;
+      return cbm * rate;
     } else {
       const weight = parseFloat(finalWeight) || 0;
-      return weight * rateKg;
+      return weight * rate;
     }
   };
 
   const finalPrice = calculateFinalPrice();
 
-  const handleConfirmReceipt = () => {
+  const handleConfirmReceipt = async () => {
     if (!scannedOrder) return;
     
     setIsUpdating(true);
@@ -154,25 +166,30 @@ export default function TransitaireScanner() {
       updates.weight = parseFloat(finalWeight) || 0;
     }
 
-    // Simulate API call
-    setTimeout(() => {
-      updateOrder(scannedOrder.id, updates);
+    try {
+      await updateOrder(scannedOrder.id, updates);
       
-      setIsUpdating(false);
       setStatus('idle');
       setScannedOrder(null);
       setIsScanning(true);
       setFinalWeight('');
+      setFinalHeight('');
       setFinalLength('');
       setFinalWidth('');
-      setFinalHeight('');
-    }, 1500);
+    } catch (error) {
+      console.error("Error updating order:", error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#F8F9FB]">
       <TransitaireSidebar />
-      <main className="lg:ml-72 p-8 lg:p-12">
+      <main className={cn(
+        "p-4 lg:p-8 transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex items-center gap-6 mb-12">
           <button onClick={() => navigate(-1)} className="p-3 bg-white border border-slate-100 rounded-2xl shadow-sm hover:bg-slate-50 transition-all">
             <ArrowLeft size={24} />
@@ -198,6 +215,28 @@ export default function TransitaireScanner() {
                   <CheckCircle2 size={64} />
                 </motion.div>
                 <p className="font-black text-xl uppercase tracking-widest">Colis Identifié</p>
+              </div>
+            )}
+            
+            {status === 'error' && (
+              <div className="p-10 bg-red-50 flex flex-col items-center justify-center text-red-600 rounded-[32px] text-center">
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="bg-white p-6 rounded-full shadow-lg mb-6"
+                >
+                  <AlertCircle size={48} />
+                </motion.div>
+                <p className="font-black text-xl uppercase tracking-widest mb-4">Erreur de Scan</p>
+                <p className="text-sm font-medium leading-relaxed max-w-[280px] mb-8">
+                  {errorMessage}
+                </p>
+                <button 
+                  onClick={resetScanner}
+                  className="px-8 py-3 bg-red-600 text-white rounded-2xl font-bold shadow-lg shadow-red-100 flex items-center gap-2"
+                >
+                  <RefreshCw size={18} /> Réessayer
+                </button>
               </div>
             )}
             

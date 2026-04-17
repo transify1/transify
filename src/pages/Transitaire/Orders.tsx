@@ -13,7 +13,7 @@ import { formatPrice, formatDate, cn } from '../../lib/utils';
 import TransitaireSidebar from '../../components/Transitaire/Sidebar';
 
 export default function TransitaireOrders() {
-  const { orders, updateOrder, addOrder, user, companies, addNotification } = useApp();
+  const { orders, updateOrder, addOrder, user, companies, addNotification, sidebarCollapsed } = useApp();
   const [filter, setFilter] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newOrder, setNewOrder] = useState({
@@ -105,7 +105,10 @@ export default function TransitaireOrders() {
   return (
     <div className="min-h-screen bg-[#F8F9FB] fluid-bg">
       <TransitaireSidebar />
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-7xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-7xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex flex-col md:flex-row justify-between items-end gap-6 mb-10">
           <div>
             <h1 className="text-[28px] font-bold text-slate-900 mb-1 tracking-tight">Gestion des Commandes</h1>

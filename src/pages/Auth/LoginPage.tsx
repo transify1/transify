@@ -4,23 +4,49 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import Logo from '../../components/Logo';
+import { supabase } from '../../lib/supabase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<'client' | 'transitaire'>('client');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const { setUser } = useApp();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role === 'transitaire') {
-      setUser({ id: 'u2', name: 'Admin Transify', email, role: 'transitaire', companyId: 'c1', subscription: 'pro' });
-      navigate('/transitaire/dashboard');
-    } else {
-      setUser({ id: 'u1', name: 'Jean Client', email, role: 'client', favorites: ['c1'] });
-      navigate('/client/dashboard');
+    setLoading(true);
+    setError(null);
+
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (loginError) {
+      setError(loginError.message);
+      setLoading(false);
+      return;
+    }
+
+    if (data.session) {
+      // Fetch user profile to check role and navigate
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.session.user.id)
+        .single();
+      
+      if (profile) {
+        if (profile.role === 'transitaire') {
+          navigate('/transitaire/dashboard');
+        } else {
+          navigate('/client/dashboard');
+        }
+      }
     }
   };
 
@@ -59,6 +85,13 @@ export default function LoginPage() {
                 Transitaire
               </button>
             </div>
+
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-[12px] text-[14px] font-medium flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse" />
+                {error}
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
@@ -101,9 +134,11 @@ export default function LoginPage() {
 
               <button 
                 type="submit"
-                className="w-full py-4 bg-[#3b82f6] text-white rounded-[12px] font-bold text-[16px] hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 active:scale-[0.98] mt-2"
+                disabled={loading}
+                className="w-full py-4 bg-[#3b82f6] text-white rounded-[12px] font-bold text-[16px] hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 active:scale-[0.98] mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Se connecter
+                {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {loading ? 'Connexion en cours...' : 'Se connecter'}
               </button>
             </form>
           </div>

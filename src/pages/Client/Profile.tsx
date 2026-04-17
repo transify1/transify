@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import ClientSidebar from '../../components/Client/Sidebar';
+import { WEST_AFRICAN_COUNTRIES } from '../../constants';
 import { cn } from '../../lib/utils';
 
 const BottomNav = () => {
@@ -44,7 +45,7 @@ const BottomNav = () => {
 };
 
 export default function ClientProfile() {
-  const { user, setUser, logout, addNotification, language, setLanguage, currency, setCurrency } = useApp();
+  const { user, setUser, updateProfile, logout, addNotification, language, setLanguage, currency, setCurrency, sidebarCollapsed } = useApp();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
@@ -57,41 +58,67 @@ export default function ClientProfile() {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    phone: '+221 77 000 00 00',
+    phone: user?.phone || '',
+    country: user?.country || WEST_AFRICAN_COUNTRIES[0].name,
     notifications: {
       status: true,
       promo: false,
       sms: true
     },
-    addresses: [
-      { id: '1', label: 'Maison (Dakar)', address: 'Sacré Cœur 3, Villa 123, Dakar, Sénégal', phone: '+221 77 123 45 67', isDefault: true },
-      { id: '2', label: 'Bureau', address: 'Immeuble ABC, Plateau, Dakar, Sénégal', phone: '+221 77 987 65 43', isDefault: false }
-    ]
+    addresses: user?.addresses || []
   });
+
+  // Sync state with user data from context
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        country: user.country || WEST_AFRICAN_COUNTRIES[0].name,
+        addresses: user.addresses || []
+      }));
+    }
+  }, [user?.id, user?.addresses]);
 
   const [newAddress, setNewAddress] = useState({
-    label: '',
+    name: '',
+    recipient: '',
+    phone: '',
     address: '',
-    phone: ''
+    city: ''
   });
 
-  const handleAddAddress = () => {
-    if (!newAddress.label || !newAddress.address) return;
+  const handleAddAddress = async () => {
+    if (!newAddress.name || !newAddress.address) return;
     
     const id = Date.now().toString();
+    const updatedAddresses = [...formData.addresses, { ...newAddress, id, isDefault: formData.addresses.length === 0 }];
+    
     setFormData({
       ...formData,
-      addresses: [...formData.addresses, { ...newAddress, id, isDefault: false }]
+      addresses: updatedAddresses
     });
     
-    setNewAddress({ label: '', address: '', phone: '' });
+    await updateProfile({
+      addresses: updatedAddresses
+    });
+    
+    setNewAddress({ name: '', recipient: '', phone: '', address: '', city: '' });
     setShowAddAddressModal(false);
     
     addNotification({
       title: 'Adresse ajoutée',
-      message: `L'adresse "${newAddress.label}" a été ajoutée à votre carnet.`,
-      type: 'success'
+      content: `L'adresse "${newAddress.name}" a été ajoutée à votre carnet.`,
+      type: 'system'
     });
+  };
+
+  const removeAddress = async (id: string) => {
+    const updatedAddresses = formData.addresses.filter(a => a.id !== id);
+    setFormData({ ...formData, addresses: updatedAddresses });
+    await updateProfile({ addresses: updatedAddresses });
   };
 
   const [passwords, setPasswords] = useState({
@@ -102,26 +129,31 @@ export default function ClientProfile() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (user) {
-      setUser({
-        ...user,
+    try {
+      await updateProfile({
         name: formData.name,
-        email: formData.email
+        email: formData.email,
+        phone: formData.phone,
+        country: formData.country
       });
+      
+      setSaveSuccess(true);
+      addNotification({
+        title: 'Profil mis à jour',
+        content: 'Vos modifications ont été enregistrées avec succès.',
+        type: 'success'
+      });
+      
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      addNotification({
+        title: 'Erreur',
+        content: 'Impossible de mettre à jour le profil.',
+        type: 'error'
+      });
+    } finally {
+      setIsSaving(false);
     }
-    
-    setIsSaving(false);
-    setSaveSuccess(true);
-    addNotification({
-      title: 'Profil mis à jour',
-      message: 'Vos modifications ont été enregistrées avec succès.',
-      type: 'success'
-    });
-    
-    setTimeout(() => setSaveSuccess(false), 3000);
   };
 
   const handleLogout = () => {
@@ -144,7 +176,10 @@ export default function ClientProfile() {
     <div className="min-h-screen bg-[#f9fafb] pb-24 lg:pb-0">
       <ClientSidebar />
       
-      <div className="lg:ml-72">
+      <div className={cn(
+        "transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         {/* Breadcrumbs & Top Bar */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
           <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -389,9 +424,7 @@ export default function ClientProfile() {
                           }}
                           className="w-full px-4 py-3 bg-[#f3f4f6] border-none rounded-lg focus:ring-2 focus:ring-blue-600 transition-all font-medium text-[15px]"
                         >
-                          <option>Franc CFA (XOF)</option>
-                          <option>Euro (€)</option>
-                          <option>Dollar ($)</option>
+                          <option>FCFA</option>
                         </select>
                       </div>
                     </div>
@@ -484,32 +517,31 @@ export default function ClientProfile() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-1">
-                              <p className="text-[16px] font-bold text-slate-900">{addr.label}</p>
+                              <p className="text-[16px] font-bold text-slate-900">{addr.name}</p>
                               <div className="flex items-center gap-3">
                                 {!addr.isDefault && (
                                   <button 
-                                    onClick={() => setFormData({
-                                      ...formData,
-                                      addresses: formData.addresses.map(a => ({...a, isDefault: a.id === addr.id}))
-                                    })}
+                                    onClick={() => {
+                                      const updated = formData.addresses.map(a => ({...a, isDefault: a.id === addr.id}));
+                                      setFormData({...formData, addresses: updated});
+                                      updateProfile({ addresses: updated });
+                                    }}
                                     className="text-[12px] font-medium text-blue-600 hover:underline"
                                   >
                                     Par défaut
                                   </button>
                                 )}
                                 <button 
-                                  onClick={() => setFormData({
-                                    ...formData,
-                                    addresses: formData.addresses.filter(a => a.id !== addr.id)
-                                  })}
+                                  onClick={() => removeAddress(addr.id)}
                                   className="text-[12px] font-medium text-red-500 hover:underline"
                                 >
                                   Supprimer
                                 </button>
                               </div>
                             </div>
-                            <p className="text-[14px] text-slate-500 font-normal mb-2">{addr.address}</p>
-                            <p className="text-[14px] font-medium text-slate-700">{addr.phone}</p>
+                            <p className="text-[14px] text-slate-500 font-normal mb-1">{addr.address}, {addr.city}</p>
+                            <p className="text-[13px] font-bold text-slate-900 mb-1">{addr.recipient}</p>
+                            <p className="text-[13px] font-medium text-slate-500">{addr.phone}</p>
                           </div>
                         </div>
                       </div>
@@ -564,13 +596,35 @@ export default function ClientProfile() {
               </div>
               
               <div className="space-y-4 mb-8">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-medium text-slate-400 mb-1.5">Nom de l'adresse</label>
+                    <input 
+                      type="text" 
+                      value={newAddress.name}
+                      onChange={(e) => setNewAddress({...newAddress, name: e.target.value})}
+                      placeholder="Ex: Maison"
+                      className="w-full px-5 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-600 transition-all font-medium text-[15px]" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-medium text-slate-400 mb-1.5">Ville</label>
+                    <input 
+                      type="text" 
+                      value={newAddress.city}
+                      onChange={(e) => setNewAddress({...newAddress, city: e.target.value})}
+                      placeholder="Dakar"
+                      className="w-full px-5 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-600 transition-all font-medium text-[15px]" 
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-[12px] font-medium text-slate-400 mb-1.5">Libellé (ex: Maison, Bureau)</label>
+                  <label className="block text-[12px] font-medium text-slate-400 mb-1.5">Nom du destinataire</label>
                   <input 
                     type="text" 
-                    value={newAddress.label}
-                    onChange={(e) => setNewAddress({...newAddress, label: e.target.value})}
-                    placeholder="Maison"
+                    value={newAddress.recipient}
+                    onChange={(e) => setNewAddress({...newAddress, recipient: e.target.value})}
+                    placeholder="Moussa Diop"
                     className="w-full px-5 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-600 transition-all font-medium text-[15px]" 
                   />
                 </div>
@@ -579,8 +633,8 @@ export default function ClientProfile() {
                   <textarea 
                     value={newAddress.address}
                     onChange={(e) => setNewAddress({...newAddress, address: e.target.value})}
-                    placeholder="Sacré Cœur 3, Villa 123..."
-                    rows={3}
+                    placeholder="Quartier, Rue, Numéro de villa..."
+                    rows={2}
                     className="w-full px-5 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-600 transition-all font-medium text-[15px] resize-none" 
                   />
                 </div>

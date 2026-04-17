@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
+import { WEST_AFRICAN_COUNTRIES } from '../../constants';
 import { 
   Settings, Building2, Globe, Ship, 
   Plane, Zap, LayoutDashboard, Package, 
@@ -17,7 +18,7 @@ import { cn } from '../../lib/utils';
 import TransitaireSidebar from '../../components/Transitaire/Sidebar';
 
 export default function TransitaireSettings() {
-  const { user, companies, updateCompany } = useApp();
+  const { user, companies, updateCompany, sidebarCollapsed } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'general';
@@ -43,7 +44,8 @@ export default function TransitaireSettings() {
     name: '',
     email: '',
     phone: '',
-    country: '',
+    phoneIndicator: WEST_AFRICAN_COUNTRIES[0].indicator,
+    country: WEST_AFRICAN_COUNTRIES[0].name,
     role: 'Agent Logistique'
   });
 
@@ -67,11 +69,12 @@ export default function TransitaireSettings() {
     const member = {
       id: Date.now(),
       ...newMember,
+      phone: `${newMember.phoneIndicator} ${newMember.phone}`,
       status: 'active'
     };
     setTeam(prev => [member, ...prev]);
     setShowAddModal(false);
-    setNewMember({ name: '', email: '', phone: '', country: '', role: 'Agent Logistique' });
+    setNewMember({ name: '', email: '', phone: '', phoneIndicator: WEST_AFRICAN_COUNTRIES[0].indicator, country: WEST_AFRICAN_COUNTRIES[0].name, role: 'Agent Logistique' });
   };
 
   const handleEditClick = (member: any) => {
@@ -172,6 +175,22 @@ export default function TransitaireSettings() {
     addressAfrica: company?.addressAfrica || 'Dakar, Plateau, Avenue Lamine Gueye'
   });
 
+  // Sync state with company data from context
+  React.useEffect(() => {
+    if (company) {
+      setGeneralData({
+        name: company.name || "",
+        description: company.description || "",
+        email: company.contact?.email || "",
+        phone: company.contact?.phone || "",
+        type: 'Transitaire',
+        country: company.locations?.china ? 'Chine' : 'Sénégal',
+        addressChina: company.addressChina || "",
+        addressAfrica: company.addressAfrica || ""
+      });
+    }
+  }, [company?.id]);
+
   const handleSave = () => {
     if (!user?.companyId) return;
     setIsSaving(true);
@@ -244,7 +263,10 @@ export default function TransitaireSettings() {
   return (
     <div className="min-h-screen bg-[#F8F9FB] fluid-bg">
       <TransitaireSidebar />
-      <main className="lg:ml-72 p-4 lg:p-8 max-w-7xl mx-auto">
+      <main className={cn(
+        "p-4 lg:p-8 max-w-7xl mx-auto transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-24" : "lg:ml-72"
+      )}>
         <header className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8">
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -385,11 +407,9 @@ export default function TransitaireSettings() {
                           onChange={(e) => setGeneralData({...generalData, country: e.target.value})}
                           className="w-full px-4 py-2 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-normal appearance-none text-[14px]"
                         >
-                          <option>Sénégal</option>
-                          <option>Côte d'Ivoire</option>
-                          <option>Mali</option>
-                          <option>France</option>
-                          <option>Chine</option>
+                          {WEST_AFRICAN_COUNTRIES.map(c => (
+                            <option key={c.code} value={c.name}>{c.name}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -884,22 +904,44 @@ export default function TransitaireSettings() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Téléphone</label>
-                    <input 
-                      type="tel" required value={newMember.phone}
-                      onChange={e => setNewMember({...newMember, phone: e.target.value})}
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-[16px] focus:ring-2 focus:ring-apple-blue transition-all text-[15px] font-medium"
-                      placeholder="+221 77 000 00 00"
-                    />
+                    <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Pays</label>
+                    <select 
+                      required value={newMember.country}
+                      onChange={e => {
+                        const countryName = e.target.value;
+                        const country = WEST_AFRICAN_COUNTRIES.find(c => c.name === countryName);
+                        setNewMember({
+                          ...newMember, 
+                          country: countryName,
+                          phoneIndicator: country?.indicator || newMember.phoneIndicator
+                        });
+                      }}
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-[16px] focus:ring-2 focus:ring-apple-blue transition-all text-[15px] font-medium appearance-none"
+                    >
+                      {WEST_AFRICAN_COUNTRIES.map(c => (
+                        <option key={c.code} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Pays</label>
-                    <input 
-                      type="text" required value={newMember.country}
-                      onChange={e => setNewMember({...newMember, country: e.target.value})}
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-[16px] focus:ring-2 focus:ring-apple-blue transition-all text-[15px] font-medium"
-                      placeholder="Ex: Sénégal"
-                    />
+                    <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Téléphone</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={newMember.phoneIndicator}
+                        onChange={(e) => setNewMember({...newMember, phoneIndicator: e.target.value})}
+                        className="w-20 px-2 py-3 bg-slate-50 border-none rounded-[16px] focus:ring-2 focus:ring-apple-blue transition-all text-[13px] font-bold appearance-none text-center"
+                      >
+                        {WEST_AFRICAN_COUNTRIES.map(c => (
+                          <option key={c.code} value={c.indicator}>{c.indicator}</option>
+                        ))}
+                      </select>
+                      <input 
+                        type="tel" required value={newMember.phone}
+                        onChange={e => setNewMember({...newMember, phone: e.target.value})}
+                        className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-[16px] focus:ring-2 focus:ring-apple-blue transition-all text-[15px] font-medium"
+                        placeholder="77 000 00 00"
+                      />
+                    </div>
                   </div>
                 </div>
 

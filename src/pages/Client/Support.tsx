@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useApp } from '../../context/AppContext';
+import { formatDate } from '../../lib/utils';
 import { 
   HelpCircle, Search, MessageSquare, Phone, 
   Mail, ChevronRight, ArrowLeft, Package,
@@ -9,44 +11,66 @@ import {
 import { Link } from 'react-router-dom';
 
 const BottomNav = () => (
-  <nav className="fixed bottom-0 left-0 right-0 glass-morphism px-6 py-3 flex justify-between items-center z-50 md:hidden">
+  <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-6 py-3 flex justify-between items-center z-50 lg:hidden">
     <Link to="/client/dashboard" className="flex flex-col items-center gap-1 text-slate-400">
-      <Home size={20} />
-      <span className="text-[11px] font-bold uppercase tracking-wider">Accueil</span>
+      <Home size={22} strokeWidth={2} />
+      <span className="text-[11px] font-medium">Accueil</span>
     </Link>
     <Link to="/client/explorer" className="flex flex-col items-center gap-1 text-slate-400">
-      <Search size={20} />
-      <span className="text-[11px] font-bold uppercase tracking-wider">Explorer</span>
+      <Search size={22} strokeWidth={2} />
+      <span className="text-[11px] font-medium">Explorer</span>
     </Link>
     <Link to="/client/orders" className="flex flex-col items-center gap-1 text-slate-400">
-      <PackageIcon size={20} />
-      <span className="text-[11px] font-bold uppercase tracking-wider">Colis</span>
+      <PackageIcon size={22} strokeWidth={2} />
+      <span className="text-[11px] font-medium">Colis</span>
     </Link>
     <Link to="/client/messages" className="flex flex-col items-center gap-1 text-slate-400">
-      <MessageSquare size={20} />
-      <span className="text-[11px] font-bold uppercase tracking-wider">Messages</span>
+      <MessageSquare size={22} strokeWidth={2} />
+      <span className="text-[11px] font-medium">Messages</span>
     </Link>
     <Link to="/client/profile" className="flex flex-col items-center gap-1 text-slate-400">
-      <UserIcon size={20} />
-      <span className="text-[11px] font-bold uppercase tracking-wider">Profil</span>
+      <UserIcon size={22} strokeWidth={2} />
+      <span className="text-[11px] font-medium">Profil</span>
     </Link>
   </nav>
 );
 
 export default function ClientSupport() {
+  const { tickets, addTicket, addNotification } = useApp();
   const [activeTab, setActiveTab] = useState<'faq' | 'tickets'>('faq');
   const [showNewTicket, setShowNewTicket] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [newTicket, setNewTicket] = useState({
+    subject: '',
+    content: '',
+    category: 'general',
+    priority: 'medium'
+  });
+
+  const handleCreateTicket = async () => {
+    if (!newTicket.subject || !newTicket.content) return;
+    
+    setIsSubmitting(true);
+    try {
+      await addTicket(newTicket);
+      setShowNewTicket(false);
+      setNewTicket({ subject: '', content: '', category: 'general', priority: 'medium' });
+      addNotification({
+        title: 'Ticket créé',
+        content: 'Votre demande de support a été enregistrée.',
+        type: 'system'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const faqs = [
     { q: "Comment suivre mon colis ?", a: "Vous pouvez suivre votre colis en temps réel dans l'onglet 'Mes expéditions' en cliquant sur le colis concerné." },
     { q: "Comment payer mon expédition ?", a: "Le paiement s'effectue généralement à la réception du colis, ou en ligne via Mobile Money selon le transitaire." },
     { q: "Que faire si mon colis est en retard ?", a: "Contactez directement votre transitaire via le bouton d'appel ou de message dans les détails de votre commande." },
     { q: "Comment contacter le transitaire ?", a: "Chaque transitaire a un profil avec ses coordonnées directes et un chat intégré." },
-  ];
-
-  const tickets = [
-    { id: 'TK-1204', subject: 'Retard de livraison', status: 'in_progress', date: '10 Avril 2026' },
-    { id: 'TK-1198', subject: 'Question sur les tarifs maritime', status: 'resolved', date: '08 Avril 2026' },
   ];
 
   const getStatusColor = (status: string) => {
@@ -165,7 +189,7 @@ export default function ClientSupport() {
                   </div>
                   <div>
                     <p className="font-bold text-slate-900 text-[13px]">{ticket.subject}</p>
-                    <p className="text-label">{ticket.id} • {ticket.date}</p>
+                    <p className="text-label">{ticket.id.substring(0, 8)} • {formatDate(ticket.createdAt)}</p>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-slate-300" />
@@ -211,20 +235,30 @@ export default function ClientSupport() {
               <div className="space-y-4">
                 <div>
                   <label className="text-label mb-1.5 block">Sujet du problème</label>
-                  <input type="text" placeholder="Ex: Retard de livraison" className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-bold text-[13px]" />
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Retard de livraison" 
+                    value={newTicket.subject}
+                    onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-bold text-[13px]" 
+                  />
                 </div>
                 <div>
                   <label className="text-label mb-1.5 block">Description détaillée</label>
-                  <textarea rows={4} placeholder="Décrivez votre problème ici..." className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-bold resize-none text-[13px]"></textarea>
+                  <textarea 
+                    rows={4} 
+                    placeholder="Décrivez votre problème ici..." 
+                    value={newTicket.content}
+                    onChange={(e) => setNewTicket({ ...newTicket, content: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-[10px] focus:ring-2 focus:ring-apple-blue transition-all font-bold resize-none text-[13px]"
+                  ></textarea>
                 </div>
-                <div>
-                  <label className="text-label mb-1.5 block">Pièce jointe (Optionnel)</label>
-                  <div className="w-full p-5 border-2 border-dashed border-slate-100 rounded-[10px] text-center text-slate-400 font-bold hover:border-apple-blue hover:text-apple-blue transition-all cursor-pointer text-[12px]">
-                    Cliquez pour ajouter une photo ou un document
-                  </div>
-                </div>
-                <button className="w-full py-3.5 bg-apple-blue text-white rounded-[10px] font-bold shadow-lg shadow-blue-50 hover:bg-blue-700 transition-all text-[13px] uppercase tracking-wider">
-                  Envoyer le ticket
+                <button 
+                  onClick={handleCreateTicket}
+                  disabled={isSubmitting || !newTicket.subject || !newTicket.content}
+                  className="w-full py-3.5 bg-apple-blue text-white rounded-[10px] font-bold shadow-lg shadow-blue-50 hover:bg-blue-700 transition-all text-[13px] uppercase tracking-wider disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Envoi...' : 'Envoyer le ticket'}
                 </button>
               </div>
             </motion.div>
