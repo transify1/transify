@@ -175,6 +175,21 @@ export default function TransitaireRegister() {
 
         if (profileError) throw profileError;
 
+        const newUser = {
+          id: authData.user.id,
+          name: formData.managerName,
+          email: formData.email,
+          role: 'transitaire' as const,
+          companyId: companyId,
+          country: formData.country,
+          phone: `${formData.phoneIndicator} ${formData.phone}`,
+          profileProgress: 25,
+          favorites: [],
+          addresses: []
+        };
+
+        setUser(newUser);
+
         // Update local state
         addCompany({
           ...companyData,

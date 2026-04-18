@@ -4,14 +4,17 @@ import { useApp } from '../../context/AppContext';
 import { 
   LayoutDashboard, Package, Users, Settings, 
   BarChart3, LogOut, Star, MessageSquare,
-  Store, Truck, ChevronLeft, ChevronRight
+  Store, Truck, ChevronLeft, ChevronRight,
+  QrCode, HelpCircle
 } from 'lucide-react';
 import Logo from '../Logo';
 import { cn } from '../../lib/utils';
 
 export default function TransitaireSidebar() {
-  const { logout, user, sidebarCollapsed, setSidebarCollapsed } = useApp();
+  const { logout, user, sidebarCollapsed, setSidebarCollapsed, messages } = useApp();
   const location = useLocation();
+
+  const unreadMessagesCount = messages.filter(m => m.receiverId === user?.id && !m.read).length;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -20,7 +23,10 @@ export default function TransitaireSidebar() {
     { path: '/transitaire/orders', icon: <Package size={20} />, label: 'Commandes' },
     { path: '/transitaire/shipments', icon: <Truck size={20} />, label: 'Expéditions' },
     { path: '/transitaire/messages', icon: <MessageSquare size={20} />, label: 'Messages' },
+    { path: '/transitaire/scanner', icon: <QrCode size={20} />, label: 'Scanner QR' },
+    { path: '/transitaire/reviews', icon: <Star size={20} />, label: 'Avis Clients' },
     { path: '/transitaire/shop', icon: <Store size={20} />, label: 'Ma Boutique' },
+    { path: '/transitaire/support', icon: <HelpCircle size={20} />, label: 'Aide & Support' },
     { path: '/transitaire/settings', icon: <Settings size={20} />, label: 'Paramètres' },
   ];
 
@@ -64,6 +70,16 @@ export default function TransitaireSidebar() {
               <span className="transition-opacity duration-300 opacity-100">
                 {item.label}
               </span>
+            )}
+            {!sidebarCollapsed && item.label === 'Messages' && unreadMessagesCount > 0 && (
+              <span className="ml-auto bg-white text-apple-blue text-[11px] font-black px-2 py-0.5 rounded-full ring-2 ring-apple-blue/10">
+                {unreadMessagesCount}
+              </span>
+            )}
+            {sidebarCollapsed && item.label === 'Messages' && unreadMessagesCount > 0 && (
+              <div className="absolute top-2 right-2 w-4 h-4 bg-white rounded-full border-2 border-apple-blue flex items-center justify-center">
+                <span className="text-[8px] font-black text-apple-blue">{unreadMessagesCount}</span>
+              </div>
             )}
           </Link>
         ))}

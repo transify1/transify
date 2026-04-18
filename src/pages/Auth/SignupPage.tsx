@@ -71,10 +71,24 @@ export default function SignupPage() {
 
         if (profileError) throw profileError;
 
+        const newUser = {
+          id: data.user.id,
+          name,
+          email,
+          role,
+          country,
+          phone: `${phoneIndicator} ${phone}`,
+          profileProgress: 15,
+          favorites: [],
+          addresses: []
+        };
+
+        setUser(newUser);
         setIsSuccess(true);
+        
         setTimeout(() => {
           navigate('/client/dashboard');
-        }, 1500);
+        }, 1000);
       }
     } catch (err: any) {
       setError(err.message || 'Une erreur est survenue lors de l\'inscription');

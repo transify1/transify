@@ -48,8 +48,11 @@ export default function TransitaireScanner() {
 
   async function onScanSuccess(decodedText: string) {
     try {
-      // The QR code now contains ONLY the order ID for security
-      const orderId = decodedText.trim();
+      // Handle both raw ID and URL formats
+      let orderId = decodedText.trim();
+      if (orderId.includes('/track/')) {
+        orderId = orderId.split('/track/').pop()?.split('?')[0] || orderId;
+      }
       
       setStatus('scanning');
       

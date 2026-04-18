@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
   LayoutDashboard, Package, Users, Settings, 
@@ -34,10 +34,20 @@ const StatCard = ({ title, value, icon, trend, color, subtitle }: any) => (
 );
 
 export default function TransitaireDashboard() {
-  const { orders, user, companies, notifications, markNotificationAsRead, markAllNotificationsAsRead, sidebarCollapsed } = useApp();
+  const { orders, user, companies, notifications, markNotificationAsRead, markAllNotificationsAsRead, sidebarCollapsed, reviews } = useApp();
+  const navigate = useNavigate();
   const [showChecklist, setShowChecklist] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const company = companies.find(c => c.id === user?.companyId);
+  const companyOrders = orders.filter(o => o.companyId === user?.companyId);
+  const companyReviews = reviews.filter(r => r.companyId === user?.companyId);
+
+  const activeOrdersCount = companyOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length;
+  const totalRevenue = companyOrders.reduce((sum, o) => sum + (o.price || 0), 0);
+  
+  const averageRating = companyReviews.length > 0 
+    ? (companyReviews.reduce((sum, r) => sum + r.rating, 0) / companyReviews.length).toFixed(1)
+    : company?.rating || "0.0";
 
   const unreadCount = notifications.filter(n => !n.read).length;
   
@@ -55,6 +65,8 @@ export default function TransitaireDashboard() {
 
   const completedCount = checklistItems.filter(item => item.completed).length;
   const progress = Math.round((completedCount / checklistItems.length) * 100);
+  const satisfaction = Math.round((Number(averageRating) / 5) * 100) || 95;
+  const stats = { satisfaction };
 
   return (
     <div className="min-h-screen bg-white fluid-bg">
@@ -269,92 +281,122 @@ export default function TransitaireDashboard() {
         </AnimatePresence>
 
         {/* Stats Grid - Bento Style */}
-        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-10">
           <StatCard 
-            title="Colis Actifs" 
-            value="124" 
-            icon={<Package />} 
+            title="Chiffre d'Affaires" 
+            value={formatPrice(totalRevenue)} 
+            icon={<BarChart3 />} 
             trend={12} 
-            color="bg-blue-50 text-apple-blue"
-            subtitle="En transit ou reçus"
+            color="bg-emerald-50 text-emerald-600"
+            subtitle="Paiements validés"
           />
           <StatCard 
-            title="Revenus Mensuels" 
-            value="2.4M FCFA" 
-            icon={<DollarSign />} 
+            title="Colis Actifs" 
+            value={activeOrdersCount.toString()} 
+            icon={<Package />} 
             trend={8} 
-            color="bg-green-50 text-green-600"
-            subtitle="Objectif: 3.0M"
+            color="bg-blue-50 text-apple-blue"
+            subtitle="En cours d'expédition"
+          />
+          <StatCard 
+            title="Satisfaction Client" 
+            value={`${stats.satisfaction}%`} 
+            icon={<Zap />} 
+            trend={2} 
+            color="bg-orange-50 text-orange-600"
+            subtitle="Basé sur les avis"
           />
           <StatCard 
             title="Délai Moyen" 
-            value="8.2 jours" 
+            value={company?.services?.find(s => s.type === 'aérien')?.delay || '7-10j'} 
             icon={<Clock />} 
-            trend={-5} 
-            color="bg-orange-50 text-orange-600"
-            subtitle="-0.5j vs mois dernier"
-          />
-          <StatCard 
-            title="Satisfaction" 
-            value="4.9/5" 
-            icon={<Activity />} 
-            color="bg-purple-50 text-purple-600"
-            subtitle="Basé sur 128 avis"
+            trend={-1} 
+            color="bg-indigo-50 text-indigo-600"
+            subtitle="Performance logistique"
           />
         </div>
 
-        {/* Charts Section - Moved from Stats */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-10">
-          <div className="apple-card !p-8 !rounded-[28px]">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-[18px] font-semibold text-slate-900 tracking-tight">Volume d'expédition</h3>
+        {/* Charts Section - Business Intelligence */}
+        <div className="grid lg:grid-cols-2 gap-8 mb-12">
+          <div className="apple-card !p-10 !rounded-[32px] group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-apple-blue/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-apple-blue/10 transition-colors" />
+            <div className="flex justify-between items-center mb-10 relative z-10">
+              <div>
+                <h3 className="text-[20px] font-bold text-slate-900 tracking-tight">Performance Mensuelle</h3>
+                <p className="text-[14px] text-slate-400 font-medium">Revenus & Volume cargo</p>
+              </div>
               <div className="flex gap-4">
-                <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-apple-blue">
-                  <span className="w-2 h-2 bg-apple-blue rounded-full"></span> Aérien
-                </span>
-                <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-slate-300">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span> Maritime
+                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.1em] text-apple-blue bg-blue-50 px-3 py-1.5 rounded-full">
+                  <span className="w-2 h-2 bg-apple-blue rounded-full"></span> Croissance
                 </span>
               </div>
             </div>
-            <div className="h-64 flex items-end justify-between gap-3">
-              {[40, 60, 45, 90, 65, 80, 55, 70, 85, 60, 95, 75].map((h, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                  <div className="w-full bg-slate-50 rounded-t-[6px] relative group overflow-hidden" style={{ height: `100%` }}>
+            <div className="h-64 flex items-end justify-between gap-2.5 relative z-10">
+              {[35, 45, 30, 70, 50, 65, 40, 55, 75, 50, 85, 95].map((h, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-3">
+                  <div className="w-full bg-slate-50/50 rounded-[8px] relative group overflow-hidden h-full">
                     <motion.div 
                       initial={{ height: 0 }}
                       animate={{ height: `${h}%` }}
-                      transition={{ duration: 1, delay: i * 0.05 }}
-                      className="absolute bottom-0 left-0 w-full bg-apple-blue rounded-t-[6px] group-hover:bg-blue-600 transition-colors"
+                      transition={{ duration: 1.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-apple-blue to-blue-400 rounded-[8px] group-hover:from-blue-600 transition-all opacity-80"
                     />
                   </div>
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">{['J','F','M','A','M','J','J','A','S','O','N','D'][i]}</span>
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{['J','F','M','A','M','J','J','A','S','O','N','D'][i]}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="apple-card !p-8 !rounded-[28px]">
-            <h3 className="text-[18px] font-semibold text-slate-900 tracking-tight mb-8">Répartition par transport</h3>
-            <div className="flex items-center justify-center h-64 relative">
-              <div className="w-48 h-48 rounded-full border-[20px] border-apple-blue border-r-slate-100 border-b-orange-400 rotate-45 shadow-inner"></div>
-              <div className="absolute flex flex-col items-center">
-                <span className="text-[28px] font-bold text-slate-900 tracking-tight">65%</span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Aérien</span>
+          <div className="apple-card !p-10 !rounded-[32px]">
+            <h3 className="text-[20px] font-bold text-slate-900 tracking-tight mb-2">Répartition Fret</h3>
+            <p className="text-[14px] text-slate-400 font-medium mb-10">Utilisation des modes de transport</p>
+            
+            <div className="grid grid-cols-2 gap-10 items-center">
+              <div className="relative w-48 h-48 flex items-center justify-center">
+                <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#F1F5F9"
+                    strokeWidth="3.5"
+                  />
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#0071E3"
+                    strokeWidth="3.8"
+                    strokeDasharray="65, 100"
+                    strokeLinecap="round"
+                    className="animate-chart-fill"
+                  />
+                </svg>
+                <div className="absolute flex flex-col items-center">
+                  <span className="text-[32px] font-black text-slate-900 tracking-tighter">65%</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aérien</span>
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-3 gap-6 mt-8">
-              <div className="text-center">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Aérien</p>
-                <p className="text-[16px] font-bold text-apple-blue">65%</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Maritime</p>
-                <p className="text-[16px] font-bold text-slate-300">25%</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Express</p>
-                <p className="text-[16px] font-bold text-orange-400">10%</p>
+
+              <div className="space-y-6">
+                {[
+                  { label: 'Aérien', value: 65, color: 'bg-apple-blue' },
+                  { label: 'Maritime', value: 25, color: 'bg-indigo-400' },
+                  { label: 'Express', value: 10, color: 'bg-orange-400' }
+                ].map((item, i) => (
+                  <div key={i} className="group cursor-pointer">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[13px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight">{item.label}</span>
+                      <span className="text-[13px] font-black text-slate-900">{item.value}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${item.value}%` }}
+                        className={`h-full ${item.color}`}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -362,11 +404,11 @@ export default function TransitaireDashboard() {
 
         {/* Main Content Grid */}
         <div className="grid xl:grid-cols-3 gap-8">
-          {/* Recent Shipments Table */}
+          {/* Recent Orders Table */}
           <div className="xl:col-span-2 apple-card overflow-hidden !p-0 !rounded-[24px]">
             <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-              <h2 className="text-[20px] font-semibold text-slate-900 tracking-tight">Expéditions Récentes</h2>
-              <Link to="/transitaire/orders" className="text-apple-blue font-medium text-[14px] flex items-center gap-1.5">
+              <h2 className="text-[20px] font-semibold text-slate-900 tracking-tight">Dernières Commandes</h2>
+              <Link to="/transitaire/orders" className="text-apple-blue font-medium text-[14px] flex items-center gap-1.5 hover:underline">
                 Voir tout <ArrowRight size={12} />
               </Link>
             </div>
@@ -375,42 +417,47 @@ export default function TransitaireDashboard() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50/50">
-                    <th className="px-6 py-4 text-[12px] font-medium text-slate-500">ID Colis</th>
-                    <th className="px-6 py-4 text-[12px] font-medium text-slate-500">Client</th>
-                    <th className="px-6 py-4 text-[12px] font-medium text-slate-500">Transport</th>
-                    <th className="px-6 py-4 text-[12px] font-medium text-slate-500">Statut</th>
-                    <th className="px-6 py-4 text-[12px] font-medium text-slate-500 text-right">Action</th>
+                    <th className="px-6 py-4 text-[12px] font-bold text-slate-500 uppercase tracking-widest">Colis</th>
+                    <th className="px-6 py-4 text-[12px] font-bold text-slate-500 uppercase tracking-widest">Client</th>
+                    <th className="px-6 py-4 text-[12px] font-bold text-slate-500 uppercase tracking-widest">Transport</th>
+                    <th className="px-6 py-4 text-[12px] font-bold text-slate-500 uppercase tracking-widest">Statut</th>
+                    <th className="px-6 py-4 text-[12px] font-bold text-slate-500 uppercase tracking-widest text-right">Montant</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {orders.map(order => (
-                    <tr key={order.id} className="hover:bg-slate-50/50 transition-colors group cursor-pointer">
+                  {companyOrders.slice(0, 5).map(order => (
+                    <tr key={order.id} onClick={() => navigate('/transitaire/orders')} className="hover:bg-slate-50/50 transition-colors group cursor-pointer">
                       <td className="px-6 py-5">
-                        <span className="font-mono text-[14px] font-semibold text-slate-900 tracking-tight">{order.trackingNumber}</span>
+                        <span className="font-mono text-[14px] font-bold text-slate-900 tracking-tight">{order.trackingNumber}</span>
+                        <p className="text-[11px] text-slate-400 font-medium">{formatDate(order.createdAt)}</p>
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-slate-100 rounded-[8px] flex items-center justify-center text-[12px] font-semibold text-slate-500">
+                          <div className="w-8 h-8 bg-slate-100 rounded-[8px] flex items-center justify-center text-[10px] font-bold text-slate-500 uppercase">
                             {order.clientName?.split(' ').map(n => n[0]).join('') || 'JC'}
                           </div>
-                          <span className="font-semibold text-[15px] text-slate-900 tracking-tight">{order.clientName || 'Jean Client'}</span>
+                          <span className="font-bold text-[15px] text-slate-900 tracking-tight truncate max-w-[120px]">{order.clientName || 'Client'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-1.5 text-slate-500">
-                          {order.serviceId.includes('s2') ? <Plane size={14} /> : <Ship size={14} />}
-                          <span className="text-[13px] font-medium">{order.serviceId.includes('s2') ? 'Aérien' : 'Maritime'}</span>
+                          {order.serviceType === 'aérien' || order.serviceType === 'express' ? <Plane size={14} className="text-indigo-500" /> : <Ship size={14} className="text-cyan-500" />}
+                          <span className="text-[13px] font-bold capitalize tracking-tight">{order.serviceType}</span>
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <span className="px-2.5 py-0.5 bg-blue-50 text-apple-blue rounded-full text-[12px] font-medium">
-                          En transit
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
+                          order.status === 'delivered' ? "bg-green-100 text-green-600" : 
+                          order.status === 'in_transit' ? "bg-blue-100 text-apple-blue" :
+                          order.status === 'problem' ? "bg-red-100 text-red-600" :
+                          "bg-slate-100 text-slate-600"
+                        )}>
+                          {order.status === 'received' ? 'Reçu' : order.status === 'in_transit' ? 'En transit' : order.status === 'arrived' ? 'Arrivé' : order.status}
                         </span>
                       </td>
-                      <td className="px-6 py-5 text-right">
-                        <button className="w-8 h-8 bg-slate-50 text-slate-400 rounded-[8px] flex items-center justify-center group-hover:bg-apple-blue group-hover:text-white transition-all ml-auto">
-                          <ArrowRight size={14} />
-                        </button>
+                      <td className="px-6 py-5 text-right font-black text-slate-900 text-[14px]">
+                        {formatPrice(order.price || 0)}
                       </td>
                     </tr>
                   ))}
@@ -452,29 +499,46 @@ export default function TransitaireDashboard() {
               </div>
             </div>
 
-            {/* Recent Activity */}
+            {/* Top Customers Card */}
             <div className="apple-card !p-8 !rounded-[24px]">
-              <h3 className="text-[18px] font-semibold tracking-tight mb-6">Activité Récente</h3>
-              <div className="space-y-8">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-slate-900 text-[18px] font-bold tracking-tight">Meilleurs Clients</h3>
+                <Link to="/transitaire/orders" className="text-[11px] font-black text-apple-blue uppercase tracking-widest hover:underline">Détails</Link>
+              </div>
+              <div className="space-y-6">
                 {[
-                  { time: 'Il y a 2 min', text: 'Colis TRX-2026-001 scanné à Guangzhou', icon: <QrCode size={16} />, color: 'bg-blue-50 text-apple-blue' },
-                  { time: 'Il y a 15 min', text: 'Nouveau client inscrit: Marie K.', icon: <Users size={16} />, color: 'bg-purple-50 text-purple-600' },
-                  { time: 'Il y a 1h', text: 'Paiement reçu pour commande #892', icon: <DollarSign size={16} />, color: 'bg-green-50 text-green-600' }
-                ].map((activity, i) => (
-                  <div key={i} className="flex gap-4 group cursor-pointer">
-                    <div className={cn("w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform", activity.color)}>
-                      {activity.icon}
+                  { name: 'Moussa Diop', revenue: 450000, orders: 12 },
+                  { name: 'Awa Ndiaye', revenue: 320000, orders: 8 },
+                  { name: 'Cheikh Gueye', revenue: 180000, orders: 5 }
+                ].map((client, i) => (
+                  <div key={i} className="flex items-center justify-between group cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-[12px] flex items-center justify-center font-bold text-xs uppercase group-hover:bg-apple-blue group-hover:text-white transition-all shadow-sm">
+                        {client.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div>
+                        <p className="text-[14px] font-bold text-slate-900 mb-0.5 tracking-tight">{client.name}</p>
+                        <p className="text-[11px] text-slate-400 font-medium">{client.orders} commandes</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[15px] font-semibold text-slate-900 leading-snug group-hover:text-apple-blue transition-colors tracking-tight">{activity.text}</p>
-                      <p className="text-[12px] font-medium text-slate-400 mt-1">{activity.time}</p>
-                    </div>
+                    <p className="text-[14px] font-black text-slate-900">{formatPrice(client.revenue)}</p>
                   </div>
                 ))}
               </div>
-              <button className="w-full py-4 bg-slate-50 text-slate-400 rounded-[16px] font-medium text-[14px] mt-8 hover:bg-slate-100 transition-all">
-                Voir tout le journal
-              </button>
+            </div>
+
+            {/* Platform Satisfaction */}
+            <div className="apple-card !p-8 !rounded-[24px] bg-blue-50/30 border-blue-100 flex items-center gap-6">
+              <div className="w-14 h-14 bg-white rounded-[16px] flex items-center justify-center text-apple-blue shadow-sm shrink-0">
+                <Zap size={24} />
+              </div>
+              <div>
+                <p className="text-[12px] font-black text-apple-blue uppercase tracking-[0.15em] mb-1">Satisfaction</p>
+                <div className="flex items-end gap-2 text-[20px] font-black text-slate-900 tracking-tighter">
+                  {stats.satisfaction}%
+                  <span className="text-[10px] text-green-500 flex items-center gap-0.5 mb-1.5"><ArrowRight size={8} className="-rotate-45" /> +2%</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

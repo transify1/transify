@@ -28,6 +28,9 @@ interface AppContextType {
   updateCompany: (companyId: string, updates: Partial<Company>) => void;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   addCompany: (company: Company) => void;
+  toasts: Toast[];
+  addToast: (toast: Omit<Toast, 'id'>) => void;
+  removeToast: (id: string) => void;
   language: string;
   setLanguage: (lang: string) => void;
   currency: string;
@@ -42,8 +45,22 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+export interface Toast {
+  id: string;
+  title: string;
+  content: string;
+  type: 'order' | 'message' | 'system';
+  duration?: number;
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const userRef = React.useRef<User | null>(null);
+  
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,6 +68,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [tickets, setTickets] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [language, setLanguage] = useState('Français (FR)');
   const [currency, setCurrency] = useState('FCFA');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -218,17 +236,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .channel('public:messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const newMessage = payload.new as any;
-        setMessages(prev => [...prev, {
-          id: newMessage.id,
-          senderId: newMessage.sender_id,
-          receiverId: newMessage.receiver_id,
-          senderName: newMessage.sender_name,
-          orderId: newMessage.order_id,
-          content: newMessage.content,
-          timestamp: newMessage.timestamp,
-          type: newMessage.type,
-          read: newMessage.read
-        }]);
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMessage.id)) return prev;
+          return [...prev, {
+            id: newMessage.id,
+            senderId: newMessage.sender_id,
+            receiverId: newMessage.receiver_id,
+            senderName: newMessage.sender_name,
+            orderId: newMessage.order_id,
+            content: newMessage.content,
+            timestamp: newMessage.timestamp,
+            type: newMessage.type,
+            read: newMessage.read
+          }];
+        });
       })
       .subscribe();
 
@@ -236,17 +257,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .channel('public:notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
         const n = payload.new as any;
-        if (n.user_id === user?.id) {
-          setNotifications(prev => [{
-            id: n.id,
-            userId: n.user_id,
+        if (n.user_id === userRef.current?.id) {
+          setNotifications(prev => {
+            if (prev.some(notif => notif.id === n.id)) return prev;
+            return [{
+              id: n.id,
+              userId: n.user_id,
+              title: n.title,
+              content: n.content,
+              type: n.type,
+              read: n.read,
+              metadata: n.metadata,
+              createdAt: n.created_at
+            }, ...prev];
+          });
+
+          // Trigger Toast
+          addToast({
             title: n.title,
             content: n.content,
-            type: n.type,
-            read: n.read,
-            metadata: n.metadata,
-            createdAt: n.created_at
-          }, ...prev]);
+            type: n.type as any
+          });
         }
       })
       .subscribe();
@@ -256,21 +287,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const o = payload.new as any;
-          setOrders(prev => [{
-            id: o.id,
-            clientId: o.client_id,
-            clientName: o.client_name,
-            clientPhone: o.client_phone,
-            companyId: o.company_id,
-            companyName: o.company_name,
-            serviceId: o.service_id,
-            serviceType: o.service_type,
-            status: o.status,
-            trackingNumber: o.tracking_number,
-            paymentStatus: o.payment_status,
-            createdAt: o.created_at,
-            updatedAt: o.updated_at
-          } as any, ...prev]);
+          setOrders(prev => {
+            if (prev.some(order => order.id === o.id)) return prev;
+            return [{
+              id: o.id,
+              clientId: o.client_id,
+              clientName: o.client_name,
+              clientPhone: o.client_phone,
+              companyId: o.company_id,
+              companyName: o.company_name,
+              serviceId: o.service_id,
+              serviceType: o.service_type,
+              status: o.status,
+              trackingNumber: o.tracking_number,
+              paymentStatus: o.payment_status,
+              createdAt: o.created_at,
+              updatedAt: o.updated_at
+            } as any, ...prev];
+          });
         } else if (payload.eventType === 'UPDATE') {
           const o = payload.new as any;
           setOrders(prev => prev.map(order => order.id === o.id ? {
@@ -288,17 +322,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const t = payload.new as any;
-          setTickets(prev => [{
-            id: t.id,
-            userId: t.user_id,
-            subject: t.subject,
-            content: t.content,
-            status: t.status,
-            priority: t.priority,
-            category: t.category,
-            createdAt: t.created_at,
-            updatedAt: t.updated_at
-          }, ...prev]);
+          setTickets(prev => {
+            if (prev.some(ticket => ticket.id === t.id)) return prev;
+            return [{
+              id: t.id,
+              userId: t.user_id,
+              subject: t.subject,
+              content: t.content,
+              status: t.status,
+              priority: t.priority,
+              category: t.category,
+              createdAt: t.created_at,
+              updatedAt: t.updated_at
+            }, ...prev];
+          });
         } else if (payload.eventType === 'UPDATE') {
           const t = payload.new as any;
           setTickets(prev => prev.map(ticket => ticket.id === t.id ? {
@@ -310,12 +347,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .subscribe();
 
+    const shipmentChannel = supabase
+      .channel('public:shipments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const s = payload.new as any;
+          setShipments(prev => {
+            if (prev.some(ship => ship.id === s.id)) return prev;
+            return [{
+              id: s.id,
+              companyId: s.company_id,
+              type: s.type,
+              status: s.status,
+              reference: s.reference,
+              departureDate: s.departure_date,
+              estimatedArrival: s.estimated_arrival,
+              from: s.from_location,
+              to: s.to_location,
+              packageCount: s.package_count,
+              capacity: s.capacity,
+              orders: s.orders || []
+            }, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const s = payload.new as any;
+          setShipments(prev => prev.map(ship => ship.id === s.id ? {
+            ...ship,
+            status: s.status,
+            packageCount: s.package_count,
+            capacity: s.capacity,
+            orders: s.orders || []
+          } : ship));
+        }
+      })
+      .subscribe();
+
     return () => {
       authSubscription.unsubscribe();
       supabase.removeChannel(messageChannel);
       supabase.removeChannel(notifChannel);
       supabase.removeChannel(orderChannel);
       supabase.removeChannel(ticketChannel);
+      supabase.removeChannel(shipmentChannel);
     };
   }, []);
 
@@ -693,6 +766,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!error) setCompanies(prev => [company, ...prev]);
   };
 
+  const addToast = (toast: Omit<Toast, 'id'>) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    const newToast = { ...toast, id };
+    setToasts(prev => [...prev, newToast]);
+    
+    setTimeout(() => {
+      removeToast(id);
+    }, toast.duration || 5000);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
   const formatPrice = (price: number) => {
     if (currency === 'Euro (€)') {
       return (price / 655.957).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -759,7 +846,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       user, setUser, companies, orders, messages, reviews, shipments, notifications, tickets,
       addOrder, updateOrder, addReview, addMessage, markAsRead, updateSubscription, toggleFavorite, 
       addShipment, updateShipment, addNotification, markNotificationAsRead, markAllNotificationsAsRead, 
-      updateCompany, updateProfile, addCompany, language, setLanguage, currency, setCurrency, formatPrice, t, logout, sidebarCollapsed, setSidebarCollapsed, loading
+      updateCompany, updateProfile, addCompany, language, setLanguage, currency, setCurrency, formatPrice, t, logout, sidebarCollapsed, setSidebarCollapsed, loading,
+      toasts, addToast, removeToast
     }}>
       {children}
     </AppContext.Provider>

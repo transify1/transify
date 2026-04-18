@@ -31,14 +31,20 @@ export default function TransitaireSettings() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'general' | 'rates' | 'team' | 'locations' | 'subscription'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'general' | 'rates' | 'team' | 'locations' | 'subscription' | 'verification'>(initialTab);
   
   React.useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['general', 'rates', 'team', 'locations', 'subscription'].includes(tab)) {
+    if (tab && ['general', 'rates', 'team', 'locations', 'subscription', 'verification'].includes(tab)) {
       setActiveTab(tab as any);
     }
   }, [searchParams]);
+
+  const [verificationDocs, setVerificationDocs] = useState({
+    idCard: { status: 'submitted', date: '2024-03-15' },
+    businessLicense: { status: 'pending', date: null },
+    taxProof: { status: 'none', date: null }
+  });
   
   const [newMember, setNewMember] = useState({
     name: '',
@@ -255,6 +261,7 @@ export default function TransitaireSettings() {
   const tabs = [
     { id: 'general', label: 'Entreprise', icon: <Building2 size={18} />, completed: getTabStatus('general') },
     { id: 'rates', label: 'Services & Tarifs', icon: <Ship size={18} />, completed: getTabStatus('rates') },
+    { id: 'verification', label: 'Vérification', icon: <Shield size={18} />, completed: true },
     { id: 'team', label: 'Équipe', icon: <Users size={18} />, completed: getTabStatus('team') },
     { id: 'locations', label: 'Adresses', icon: <MapPin size={18} />, completed: getTabStatus('locations') },
     { id: 'subscription', label: 'Abonnement', icon: <CreditCard size={18} />, completed: true },
@@ -346,6 +353,86 @@ export default function TransitaireSettings() {
         <div className="grid xl:grid-cols-3 gap-8">
           <div className="xl:col-span-2">
             <AnimatePresence mode="wait">
+              {activeTab === 'verification' && (
+              <div className="space-y-8">
+                <div className="apple-card !p-8 !rounded-[28px] bg-slate-900 border-none text-white relative overflow-hidden">
+                  <div className="relative z-10 max-w-xl">
+                    <h3 className="text-[20px] font-bold mb-2">Vérification de l'identité</h3>
+                    <p className="text-white/60 text-[14px] mb-6 font-medium">Pour assurer la sécurité de nos utilisateurs, nous vérifions l'identité de tous les transitaires. La vérification est obligatoire pour apparaître en haut des résultats de recherche.</p>
+                    <div className="flex items-center gap-3 py-2 px-4 bg-white/10 rounded-full w-fit">
+                      <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
+                      <span className="text-[12px] font-bold uppercase tracking-widest">En cours de vérification</span>
+                    </div>
+                  </div>
+                  <Shield size={180} className="absolute -right-10 -bottom-10 text-white/5 rotate-12" />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="apple-card !p-8 !rounded-[28px]">
+                    <h3 className="text-[16px] font-bold text-slate-900 mb-6">Documents Requis</h3>
+                    <div className="space-y-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex gap-4">
+                          <div className="w-10 h-10 bg-slate-100 rounded-[12px] flex items-center justify-center text-slate-400 shrink-0">
+                            <FileText size={20} />
+                          </div>
+                          <div>
+                            <p className="text-[14px] font-bold text-slate-900">Pièce d'Identité (Gérant)</p>
+                            <p className="text-[12px] text-slate-500 font-medium">CNI, Passeport ou Permis de conduire</p>
+                            <span className="text-[11px] font-black text-green-500 uppercase tracking-widest mt-2 block">Vérifié le 15/03/2024</span>
+                          </div>
+                        </div>
+                        <CheckCircle2 size={20} className="text-green-500" />
+                      </div>
+
+                      <div className="flex items-start justify-between">
+                        <div className="flex gap-4">
+                          <div className="w-10 h-10 bg-slate-100 rounded-[12px] flex items-center justify-center text-slate-400 shrink-0">
+                            <FileText size={20} />
+                          </div>
+                          <div>
+                            <p className="text-[14px] font-bold text-slate-900">Registre du Commerce (RCCM)</p>
+                            <p className="text-[12px] text-slate-500 font-medium">Document officiel de votre entreprise</p>
+                            <span className="text-[11px] font-black text-orange-400 uppercase tracking-widest mt-2 block">En cours de validation</span>
+                          </div>
+                        </div>
+                        <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                      </div>
+
+                      <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-[20px] text-center">
+                        <Plus size={24} className="mx-auto text-slate-300 mb-2" />
+                        <p className="text-[13px] font-bold text-slate-900">Ajouter un document</p>
+                        <p className="text-[11px] text-slate-500 font-medium mt-1">PDF, JPG ou PNG (Max 5MB)</p>
+                        <input type="file" className="hidden" id="doc-upload" />
+                        <label htmlFor="doc-upload" className="mt-4 inline-block px-4 py-2 bg-white border border-slate-100 rounded-[10px] text-[11px] font-bold text-apple-blue uppercase tracking-widest cursor-pointer hover:bg-slate-50 shadow-sm transition-all">Parcourir</label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="apple-card !p-8 !rounded-[28px] border-apple-blue/10 bg-blue-50/20">
+                    <h3 className="text-[16px] font-bold text-slate-900 mb-6 font-display">Pourquoi la vérification ?</h3>
+                    <ul className="space-y-4">
+                      {[
+                        { title: "Badge de confiance", text: "Un badge bleu apparaîtra sur votre profil public." },
+                        { title: "Priorité de recherche", text: "Vos services sont affichés en haut de liste." },
+                        { title: "Paiements Simplifiés", text: "Accédez à de nouveaux modes de paiement." },
+                        { title: "Support Dédié", text: "Une ligne directe vers notre équipe juridique." }
+                      ].map((item, i) => (
+                        <li key={i} className="flex gap-3">
+                          <div className="w-5 h-5 rounded-full bg-apple-blue text-white flex items-center justify-center shrink-0 mt-0.5">
+                            <Check size={12} />
+                          </div>
+                          <div>
+                            <p className="text-[14px] font-bold text-slate-900 mb-0.5">{item.title}</p>
+                            <p className="text-[12px] text-slate-500 font-medium">{item.text}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
               {activeTab === 'general' && (
                 <motion.div
                   key="general"
@@ -650,43 +737,84 @@ export default function TransitaireSettings() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
+                  className="space-y-8"
                 >
-                  {/* Locations */}
-                  <div className="apple-card">
-                    <h3 className="text-[16px] font-medium text-slate-900 tracking-tight mb-6 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <MapPin className="text-apple-blue" size={18} /> Adresses & Entrepôts
+                  {/* Locations Detail */}
+                  <div className="grid md:grid-cols-2 gap-8">
+                    {/* Chine Warehouse */}
+                    <div className="apple-card !p-8 !rounded-[32px]">
+                      <div className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 bg-red-50 text-red-500 rounded-[16px] flex items-center justify-center font-black">CN</div>
+                        <div>
+                          <h3 className="text-[18px] font-bold text-slate-900 tracking-tight">Entrepôt Chine</h3>
+                          <p className="text-[12px] text-slate-400 font-medium uppercase tracking-widest">Guangzhou / Yiwu</p>
+                        </div>
                       </div>
-                      {(!generalData.addressChina || !generalData.addressAfrica) && (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[8px] font-bold uppercase tracking-widest rounded-full animate-pulse">
-                          Incomplet
-                        </span>
-                      )}
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-1.5">Entrepôt Chine</label>
-                        <textarea 
-                          rows={2}
-                          value={generalData.addressChina}
-                          onChange={(e) => setGeneralData({...generalData, addressChina: e.target.value})}
-                          className="w-full text-[14px] font-normal text-slate-900 bg-slate-50 p-4 rounded-[12px] border border-slate-100/50 focus:ring-1 focus:ring-apple-blue resize-none"
-                        />
+
+                      <div className="space-y-6">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Adresse Complète</label>
+                          <textarea 
+                            rows={3}
+                            value={generalData.addressChina}
+                            onChange={(e) => setGeneralData({...generalData, addressChina: e.target.value})}
+                            className="w-full text-[14px] font-medium text-slate-900 bg-slate-50 p-4 rounded-[16px] border border-slate-50 focus:ring-2 focus:ring-apple-blue resize-none transition-all"
+                            placeholder="Copiez l'adresse précise ici..."
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Horaires</label>
+                            <input type="text" defaultValue="09:00 - 18:00" className="w-full text-[13px] font-bold text-slate-900 bg-slate-50 p-3 rounded-[12px] border-none" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Contact</label>
+                            <input type="text" defaultValue="+86 185..." className="w-full text-[13px] font-bold text-slate-900 bg-slate-50 p-3 rounded-[12px] border-none" />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-1.5">Bureau Afrique</label>
-                        <textarea 
-                          rows={2}
-                          value={generalData.addressAfrica}
-                          onChange={(e) => setGeneralData({...generalData, addressAfrica: e.target.value})}
-                          className="w-full text-[14px] font-normal text-slate-900 bg-slate-50 p-4 rounded-[12px] border border-slate-100/50 focus:ring-1 focus:ring-apple-blue resize-none"
-                        />
+                    </div>
+
+                    {/* Afrique Office */}
+                    <div className="apple-card !p-8 !rounded-[32px]">
+                      <div className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 bg-green-50 text-green-500 rounded-[16px] flex items-center justify-center font-black">SN</div>
+                        <div>
+                          <h3 className="text-[18px] font-bold text-slate-900 tracking-tight">Bureau Dakar</h3>
+                          <p className="text-[12px] text-slate-400 font-medium uppercase tracking-widest">Sénégal</p>
+                        </div>
                       </div>
-                      <button className="w-full py-3.5 border border-dashed border-slate-200 rounded-[16px] text-slate-400 font-medium uppercase tracking-widest hover:border-apple-blue hover:text-apple-blue transition-all text-[11px] flex items-center justify-center gap-2">
-                        <Plus size={16} /> Ajouter une adresse
-                      </button>
+
+                      <div className="space-y-6">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Adresse de Réception</label>
+                          <textarea 
+                            rows={3}
+                            value={generalData.addressAfrica}
+                            onChange={(e) => setGeneralData({...generalData, addressAfrica: e.target.value})}
+                            className="w-full text-[14px] font-medium text-slate-900 bg-slate-50 p-4 rounded-[16px] border border-slate-50 focus:ring-2 focus:ring-apple-blue resize-none transition-all"
+                            placeholder="Dakar, Plateau, Rue..."
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Horaires</label>
+                            <input type="text" defaultValue="08:30 - 19:00" className="w-full text-[13px] font-bold text-slate-900 bg-slate-50 p-3 rounded-[12px] border-none" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Contact</label>
+                            <input type="text" defaultValue="+221 77..." className="w-full text-[13px] font-bold text-slate-900 bg-slate-50 p-3 rounded-[12px] border-none" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
+                  <button className="w-full py-4 border-2 border-dashed border-slate-100 rounded-[28px] text-slate-400 font-bold uppercase tracking-widest hover:border-apple-blue hover:text-apple-blue transition-all flex items-center justify-center gap-3 text-[12px] bg-slate-50/30">
+                    <Plus size={20} /> Ajouter une autre agence
+                  </button>
                 </motion.div>
               )}
 

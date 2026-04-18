@@ -9,7 +9,7 @@ import {
   LayoutGrid, List as ListIcon,
   BarChart3, TrendingUp, X,
   MessageSquare, Map as MapIcon,
-  QrCode, Camera, Check
+  QrCode, Camera, Check, FileText, Download
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import TransitaireSidebar from '../../components/Transitaire/Sidebar';
@@ -963,14 +963,22 @@ export default function TransitaireShipments() {
                 <div className="p-8 overflow-y-auto flex-1">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Colis dans l'expédition ({activeShipment.packageCount})</h3>
-                    <div className="text-right">
-                      <p className="text-xs font-black text-slate-900">{activeShipment.capacity.used} / {activeShipment.capacity.total} {activeShipment.capacity.unit}</p>
-                      <div className="w-32 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-600" 
-                          style={{ width: `${(activeShipment.capacity.used / activeShipment.capacity.total) * 100}%` }}
-                        />
+                    <div className="text-right flex items-center gap-4">
+                      <div>
+                        <p className="text-xs font-black text-slate-900">{activeShipment.capacity.used} / {activeShipment.capacity.total} {activeShipment.capacity.unit}</p>
+                        <div className="w-32 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-600" 
+                            style={{ width: `${(activeShipment.capacity.used / activeShipment.capacity.total) * 100}%` }}
+                          />
+                        </div>
                       </div>
+                      <button 
+                        className="p-2.5 bg-white border border-slate-100 text-slate-600 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm"
+                        title="Télécharger le Manifeste"
+                      >
+                        <FileText size={16} /> Manifeste
+                      </button>
                     </div>
                   </div>
 
@@ -1010,14 +1018,36 @@ export default function TransitaireShipments() {
 
                 <div className="p-8 bg-slate-50/50 border-t border-slate-50 flex gap-4">
                   {activeShipment.status === 'preparation' && (
+                    <>
+                      <button 
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          handleOpenScan(activeShipment);
+                        }}
+                        className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200"
+                      >
+                        Scanner un colis
+                      </button>
+                      <button 
+                        onClick={() => {
+                          startShipment(activeShipment);
+                          setShowDetailModal(false);
+                        }}
+                        className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest"
+                      >
+                        Lancer le Voyage
+                      </button>
+                    </>
+                  )}
+                  {activeShipment.status === 'in_transit' && (
                     <button 
                       onClick={() => {
+                        markArrived(activeShipment);
                         setShowDetailModal(false);
-                        handleOpenScan(activeShipment);
                       }}
-                      className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200"
+                      className="flex-1 py-4 bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-green-100"
                     >
-                      Scanner un colis
+                      Marquer comme Arrivé
                     </button>
                   )}
                   <button 

@@ -6,7 +6,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
-import { hasSupabaseConfig } from './lib/supabase';
+import { hasSupabaseConfig, configStatus } from './lib/supabase';
 import LandingPage from './pages/Landing/LandingPage';
 import LoginPage from './pages/Auth/LoginPage';
 import SignupPage from './pages/Auth/SignupPage';
@@ -17,6 +17,8 @@ import Explorer from './pages/Client/Explorer';
 import ClientOrders from './pages/Client/Orders';
 import ClientProfile from './pages/Client/Profile';
 import ClientSupport from './pages/Client/Support';
+import Support from './pages/Shared/Support';
+import TransitaireReviews from './pages/Transitaire/Reviews';
 import TransitaireProfile from './pages/Client/TransitaireProfile';
 import CreateOrder from './pages/Client/CreateOrder';
 import ReviewOrder from './pages/Client/ReviewOrder';
@@ -32,6 +34,7 @@ import TransitaireScanner from './pages/Transitaire/Scanner';
 import TransitaireMessages from './pages/Transitaire/Messages';
 import TransitaireChat from './pages/Transitaire/Chat';
 import ShopSettings from './pages/Transitaire/ShopSettings';
+import RealtimeNotifications from './components/RealtimeNotifications';
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
   const { user } = useApp();
@@ -60,11 +63,27 @@ function AppRoutes() {
           <div className="bg-slate-50 rounded-2xl p-6 text-left mb-8">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Variables requises :</p>
             <ul className="space-y-3">
-              <li className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                <div className="w-2 h-2 rounded-full bg-slate-300" /> VITE_SUPABASE_URL
+              <li className="flex items-center justify-between text-sm font-medium">
+                <div className="flex items-center gap-3 text-slate-600">
+                  <div className={`w-2 h-2 rounded-full ${configStatus.url ? 'bg-emerald-500' : 'bg-slate-300'}`} /> 
+                  VITE_SUPABASE_URL
+                </div>
+                {configStatus.url ? (
+                  <span className="text-emerald-600 text-[10px] font-black uppercase bg-emerald-50 px-2 py-0.5 rounded">Configuré</span>
+                ) : (
+                  <span className="text-amber-600 text-[10px] font-black uppercase bg-amber-50 px-2 py-0.5 rounded">Manquant</span>
+                )}
               </li>
-              <li className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                <div className="w-2 h-2 rounded-full bg-slate-300" /> VITE_SUPABASE_ANON_KEY
+              <li className="flex items-center justify-between text-sm font-medium">
+                <div className="flex items-center gap-3 text-slate-600">
+                  <div className={`w-2 h-2 rounded-full ${configStatus.key ? 'bg-emerald-500' : 'bg-slate-300'}`} /> 
+                  VITE_SUPABASE_ANON_KEY
+                </div>
+                {configStatus.key ? (
+                  <span className="text-emerald-600 text-[10px] font-black uppercase bg-emerald-50 px-2 py-0.5 rounded">Configuré</span>
+                ) : (
+                  <span className="text-amber-600 text-[10px] font-black uppercase bg-amber-50 px-2 py-0.5 rounded">Manquant</span>
+                )}
               </li>
             </ul>
           </div>
@@ -101,7 +120,7 @@ function AppRoutes() {
           <Route path="profile" element={<ProtectedRoute allowedRoles={['client']}><ClientProfile /></ProtectedRoute>} />
           <Route path="messages" element={<ProtectedRoute allowedRoles={['client']}><ClientMessages /></ProtectedRoute>} />
           <Route path="chat/:id" element={<ProtectedRoute allowedRoles={['client']}><ClientChat /></ProtectedRoute>} />
-          <Route path="support" element={<ProtectedRoute allowedRoles={['client']}><ClientSupport /></ProtectedRoute>} />
+          <Route path="support" element={<ProtectedRoute allowedRoles={['client']}><Support /></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute allowedRoles={['client']}><Navigate to="/client/profile?tab=settings" replace /></ProtectedRoute>} />
           <Route path="transitaire/:id" element={<ProtectedRoute allowedRoles={['client', 'transitaire']}><TransitaireProfile /></ProtectedRoute>} />
           <Route path="order/new/:companyId" element={<ProtectedRoute allowedRoles={['client']}><CreateOrder /></ProtectedRoute>} />
@@ -122,6 +141,8 @@ function AppRoutes() {
             <Route path="messages" element={<TransitaireMessages />} />
             <Route path="chat/:id" element={<TransitaireChat />} />
             <Route path="shop" element={<ShopSettings />} />
+            <Route path="reviews" element={<TransitaireReviews />} />
+            <Route path="support" element={<Support />} />
             <Route path="settings" element={<TransitaireSettings />} />
           </Routes>
         </ProtectedRoute>
@@ -135,6 +156,7 @@ export default function App() {
     <AppProvider>
       <Router>
         <AppRoutes />
+        <RealtimeNotifications />
       </Router>
     </AppProvider>
   );
